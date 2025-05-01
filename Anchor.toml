@@ -1,0 +1,58 @@
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+protocol = "E35TzkfrR1LoNEevvRFK9frvrFQgSGxN251rvpVrzW2"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+# cluster = "https://devnet.helius-rpc.com/?api-key=074f9832-beac-403b-a698-4c3ed9045065"
+# cluster = "https://mainnet.helius-rpc.com/?api-key=074f9832-beac-403b-a698-4c3ed9045065"
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
+
+[test]
+startup_wait = 10000
+
+# Pyth solana receiver program
+[[test.genesis]]
+address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
+program = "program_dumps/pyth-solana-receiver.so"
+
+# Pyth solana price feed program
+[[test.genesis]]
+address = "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT"
+program = "program_dumps/pyth-price-feed.so"
+
+# Wormhole program
+[[test.genesis]]
+address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
+program = "program_dumps/wormhole.so"
+
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+ 
+ # Bonk feed account
+[[test.validator.clone]]
+address = "DBE3N8uNjhKPRHfANdwGvCZghWXyLPdqdSbEW2XFwBiX"
+
+# Popcat feed account
+[[test.validator.clone]]
+address = "6UxPR2nXJNNM1nESVWGAf8NXMVu3SGgYf3ZfUFoGB9cs"
+
+# Wormhole guardian set account
+[[test.validator.clone]]
+address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn"
+
+# Configuration account
+[[test.validator.clone]]
+address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
+
