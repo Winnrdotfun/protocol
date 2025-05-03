@@ -11,9 +11,10 @@ protocol = "E35TzkfrR1LoNEevvRFK9frvrFQgSGxN251rvpVrzW2"
 url = "https://api.apr.dev"
 
 [provider]
+cluster = "http://localhost:8899"
 # cluster = "https://devnet.helius-rpc.com/?api-key=074f9832-beac-403b-a698-4c3ed9045065"
 # cluster = "https://mainnet.helius-rpc.com/?api-key=074f9832-beac-403b-a698-4c3ed9045065"
-cluster = "Localnet"
+# cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
@@ -40,13 +41,21 @@ program = "program_dumps/wormhole.so"
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
  
- # Bonk feed account
+# BONK feed account
 [[test.validator.clone]]
 address = "DBE3N8uNjhKPRHfANdwGvCZghWXyLPdqdSbEW2XFwBiX"
 
-# Popcat feed account
+# POPCAT feed account
 [[test.validator.clone]]
 address = "6UxPR2nXJNNM1nESVWGAf8NXMVu3SGgYf3ZfUFoGB9cs"
+
+# WIF feed account
+[[test.validator.clone]]
+address = "6B23K3tkb51vLZA14jcEQVCA1pfHptzEHFA93V5dYwbT"
+
+# TRUMP feed account
+[[test.validator.clone]]
+address = "9vNb2tQoZ8bB4vzMbQLWViGwNaDJVtct13AGgno1wazp"
 
 # Wormhole guardian set account
 [[test.validator.clone]]
