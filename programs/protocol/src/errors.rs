@@ -20,5 +20,6 @@ pub enum ContestError {
     AlreadyFull,
     ContestNotEnded,
     AlreadyResolved,
+    NotWinner,
 }
 
