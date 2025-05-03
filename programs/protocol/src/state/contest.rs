@@ -17,8 +17,6 @@ pub struct TokenDraftContest {
 
     pub max_entries: u32,
 
-    pub num_winners: u32,
-
     pub num_entries: u32,
 
     #[max_len(MAX_TOKEN_PER_DRAFT)]
@@ -29,6 +27,12 @@ pub struct TokenDraftContest {
 
     #[max_len(MAX_TOKEN_PER_DRAFT)]
     pub token_rois: Vec<f64>,
+
+    #[max_len(0)]
+    pub winner_ids: Vec<u32>,
+
+    #[max_len(0)]
+    pub winner_reward_allocation: Vec<u8>,
 
     pub is_resolved: bool,
 }

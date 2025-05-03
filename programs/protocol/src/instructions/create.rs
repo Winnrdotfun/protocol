@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 use crate::state::contest::{TokenDraftContest, MAX_TOKEN_PER_DRAFT};
+use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
 use crate::errors::ContestError;
 
@@ -25,6 +26,15 @@ pub struct CreateTokenDraftContest<'info> {
     )]
     pub contest: Account<'info, TokenDraftContest>,
 
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + TokenDraftContest::INIT_SPACE,
+        seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
+        bump
+    )]
+    pub credits: Account<'info, TokenDraftContestCredits>,
+
     pub feed0: Option<Account<'info, PriceUpdateV2>>,
     pub feed1: Option<Account<'info, PriceUpdateV2>>,
     pub feed2: Option<Account<'info, PriceUpdateV2>>,
@@ -40,8 +50,8 @@ pub fn create_token_draft_contest(
     end_time: u64,
     entry_fee: u64,
     max_entries: u32,
-    num_winners: u32,
     token_feed_ids: Vec<Pubkey>,
+    reward_allocation: Vec<u8>,
 ) -> Result<()> {
     let contest = &mut ctx.accounts.contest;
     let current_time = Clock::get()?.unix_timestamp as u64;
@@ -58,6 +68,7 @@ pub fn create_token_draft_contest(
     // At least one token must be selected for the draft and no more than MAX_TOKEN_PER_DRAFT
     require!(token_feed_ids.len() > 0 && token_feed_ids.len() <= MAX_TOKEN_PER_DRAFT, ContestError::InvalidDraftTokenCount);
 
+    // Set start prices for each token
     let feed_accounts: Vec<&Option<Account<'_, PriceUpdateV2>>> = vec![
         &ctx.accounts.feed0,
         &ctx.accounts.feed1,
@@ -65,7 +76,6 @@ pub fn create_token_draft_contest(
         &ctx.accounts.feed3,
         &ctx.accounts.feed4,
         ];
-
     let clock = Clock::get()?;
     contest.token_start_prices = Vec::new();
     for (i, feed_id) in token_feed_ids.iter().enumerate() {
@@ -74,17 +84,24 @@ pub fn create_token_draft_contest(
         let price = get_token_price(&clock, &feed_id, feed_account)?;
         contest.token_start_prices.push(price);
     }
-        
+
+    // Set contest parameters 
     contest.id = ctx.accounts.contest_metadata.token_draft_contest_count;
     contest.creator = ctx.accounts.signer.key();
     contest.start_time = start_time;
     contest.end_time = end_time;
     contest.entry_fee = entry_fee;
     contest.max_entries = max_entries;
-    contest.num_winners = num_winners;
-    contest.num_entries = 0;
     contest.token_feed_ids = token_feed_ids;
     contest.is_resolved = false;
+
+    // Initialize credit data
+    ctx.accounts.credits.contest = contest.key();
+    ctx.accounts.credits.credit_allocations = Vec::new();
+
+    // Initialize winner data
+    ctx.accounts.contest.winner_ids = Vec::new();
+    ctx.accounts.contest.winner_reward_allocation = reward_allocation;
 
     Ok(())
 }

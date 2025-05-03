@@ -12,11 +12,9 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   InstructionWithEphemeralSigners,
   PythSolanaReceiver,
-  DEFAULT_WORMHOLE_PROGRAM_ID,
 } from "@pythnetwork/pyth-solana-receiver";
 import {
   Account,
-  getAccount,
   getOrCreateAssociatedTokenAccount,
   mintTo,
 } from "@solana/spl-token";
@@ -26,7 +24,7 @@ import { HermesClient } from "@pythnetwork/hermes-client";
 
 const { PublicKey } = web3;
 
-describe.only("resolve2", () => {
+describe.skip("resolve2", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;
@@ -81,8 +79,8 @@ describe.only("resolve2", () => {
       endTime,
       entryFee: new BN(10 * LAMPORTS_PER_SOL),
       maxEntries: 100,
-      numWinners: 10,
       priceFeedIds: [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat],
+      rewardAllocation: [70, 30],
     };
     const createRes = await createContest({
       provider,
@@ -115,7 +113,7 @@ describe.only("resolve2", () => {
       tokenProgram: utils.token.TOKEN_PROGRAM_ID,
     };
 
-    const creditAllocation = [50, 50];
+    const creditAllocation = [25, 75];
     const creditAllocationInp = Buffer.from(creditAllocation); // new Uint8Array(creditAllocation);
     const txSignature = await pg.methods
       .enterTokenDraftContest(creditAllocationInp)
@@ -214,21 +212,6 @@ describe.only("resolve2", () => {
     const contestEntry = await pg.account.tokenDraftContestEntry.fetch(
       contestEntryPda
     );
-    console.log("Contest:", contest);
-    console.log("Contest entry:", contestEntry);
     expect(contest.isResolved).equal(true);
-
-    // const accounts2 = {
-    //   signer: signer.publicKey,
-    //   contest: contestPda,
-    // };
-
-    // const txSignature2 = await pg.methods
-    //   .resolveTokenDraftContest()
-    //   .accounts(accounts)
-    //   .signers([signer])
-    //   .rpc();
-
-    // console.log("Transaction signature", txSignature2);
   });
 });

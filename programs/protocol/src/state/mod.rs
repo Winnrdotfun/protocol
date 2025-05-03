@@ -2,4 +2,4 @@ pub mod config;
 pub mod metadata;
 pub mod contest;
 pub mod entry;
-pub mod allocation;
+pub mod credit;

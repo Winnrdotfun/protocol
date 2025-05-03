@@ -22,8 +22,8 @@ pub mod protocol {
         end_time: u64,
         entry_fee: u64,
         max_entries: u32,
-        num_winners: u32,
         token_feed_ids: Vec<Pubkey>,
+        reward_allocation: Vec<u8>,
     ) -> Result<()> {
         create::create_token_draft_contest(
             ctx,
@@ -31,8 +31,8 @@ pub mod protocol {
             end_time,
             entry_fee,
             max_entries,
-            num_winners,
             token_feed_ids,
+            reward_allocation,
         )
     }
 

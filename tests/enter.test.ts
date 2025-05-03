@@ -72,8 +72,8 @@ describe.skip("enter", () => {
       endTime,
       entryFee: new BN(10 * LAMPORTS_PER_SOL),
       maxEntries: 100,
-      numWinners: 10,
       priceFeedIds: [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat],
+      rewardAllocation: [50, 50],
     };
     const createRes = await createContest({
       provider,
@@ -94,22 +94,28 @@ describe.skip("enter", () => {
       ],
       programId
     );
+    const [contestCreditsPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("token_draft_contest_credits"), contestPda.toBuffer()],
+      programId
+    );
 
     const accounts = {
       signer: signer.publicKey,
       config: configPda,
       contest: contestPda,
       contestEntry: contestEntryPda,
+      contestCredits: contestCreditsPda,
       mint,
       programTokenAccount: programTokenAccountPda,
       signerTokenAccount: signerTokenAccount.address,
       tokenProgram: utils.token.TOKEN_PROGRAM_ID,
     };
 
-    const creditAllocation = [50_000, 50_000];
-
+    const creditAllocation = [35, 65];
+    const creditAllocationInput = Buffer.from(creditAllocation);
+    // console.log("creditAllocationInput:", creditAllocationInput);
     const txSignature = await pg.methods
-      .enterTokenDraftContest(creditAllocation)
+      .enterTokenDraftContest(creditAllocationInput)
       .accounts(accounts)
       .signers([signer])
       .rpc();
@@ -129,13 +135,15 @@ describe.skip("enter", () => {
       programTokenAccount.amount.toString()
     );
 
+    const contest = await pg.account.tokenDraftContest.fetch(contestPda);
     const contestEntry = await pg.account.tokenDraftContestEntry.fetch(
       contestEntryPda
     );
     // console.log("Contest entry:", contestEntry);
-
+    expect(contest.numEntries).equal(1);
+    expect(contestEntry.id).equal(0);
     expect(contestEntry.user.toBase58()).equal(signer.publicKey.toBase58());
-    expect(contestEntry.contest.toBase58()).equal(contestPda.toBase58());
+    expect(contestEntry.contestKey.toBase58()).equal(contestPda.toBase58());
     expect(contestEntry.creditAllocation.length).equal(creditAllocation.length);
     for (let i = 0; i < creditAllocation.length; i++) {
       expect(contestEntry.creditAllocation[i]).equal(creditAllocation[i]);
@@ -144,5 +152,13 @@ describe.skip("enter", () => {
     expect(programTokenAccount.amount.toString()).equal(
       new BN(10 * LAMPORTS_PER_SOL).toString()
     );
+
+    const contestCredits = await pg.account.tokenDraftContestCredits.fetch(
+      contestCreditsPda
+    );
+    expect(contestCredits.contest.toBase58()).equal(contestPda.toBase58());
+    for (let i = 0; i < creditAllocation.length; i++) {
+      expect(creditAllocation[i]).equal(contestCredits.creditAllocations[i]);
+    }
   });
 });

@@ -49,24 +49,30 @@ describe.skip("create", () => {
       ],
       programId
     );
+    const [creditsPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("token_draft_contest_credits"), contestPda.toBuffer()],
+      programId
+    );
 
     const currentTime = Math.floor(Date.now() / 1000);
     const startTime = new BN(currentTime + 60 * 60); // 1 hour from now
     const endTime = new BN(startTime.toNumber() + 60 * 60 * 24); // 1 day from now
     const entryFee = new BN(10 * LAMPORTS_PER_SOL);
     const maxEntries = 100;
-    const numWinners = 10;
     const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
     const tokenFeedIds = priceFeedIds.map((v) => new PublicKey(hexToBase58(v)));
     const feedAccounts = priceFeedIds.map((v) =>
       pythSolanaReceiver.getPriceFeedAccountAddress(0, v)
     );
-    feedAccounts.map((acc) => console.log("acc:", acc.toBase58()));
+    // feedAccounts.map((acc) => console.log("acc:", acc.toBase58()));
+    const winnerRewardAllocation = [40, 20, 20, 10, 10];
+    const numWinners = winnerRewardAllocation.length;
 
     const accounts = {
       signer: signer.publicKey,
       contestMetadata: contestMetadataPda,
       contest: contestPda,
+      credits: creditsPda,
       feed0: feedAccounts[0],
       feed1: feedAccounts[1] || null,
       feed2: feedAccounts[2] || null,
@@ -80,8 +86,8 @@ describe.skip("create", () => {
         endTime,
         entryFee,
         maxEntries,
-        numWinners,
-        tokenFeedIds
+        tokenFeedIds,
+        Buffer.from(winnerRewardAllocation)
       )
       .accounts(accounts)
       .signers([signer])
@@ -89,7 +95,10 @@ describe.skip("create", () => {
     console.log("Tx signature:", sig);
 
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
-    // console.log("Contest account:", contest);
+    const contestCredits = await pg.account.tokenDraftContestCredits.fetch(
+      creditsPda
+    );
+    console.log("Contest account:", contest);
     expect(contest.id.toNumber()).equal(
       contestMetadata.tokenDraftContestCount.toNumber()
     );
@@ -98,7 +107,6 @@ describe.skip("create", () => {
     expect(contest.endTime.toNumber()).equal(endTime.toNumber());
     expect(contest.entryFee.toString()).equal(entryFee.toString());
     expect(contest.maxEntries).equal(maxEntries);
-    expect(contest.numWinners).equal(numWinners);
     expect(contest.numEntries).equal(0);
     expect(contest.tokenFeedIds.length).equal(tokenFeedIds.length);
     for (let i = 0; i < tokenFeedIds.length; i++) {
@@ -108,5 +116,14 @@ describe.skip("create", () => {
     }
     expect(contest.tokenStartPrices.length).equal(tokenFeedIds.length);
     expect(contest.tokenRois.length).equal(0);
+    expect(contestCredits.contest.toBase58()).equal(contestPda.toBase58());
+    expect(contestCredits.creditAllocations.length).equal(0);
+    expect(contest.winnerIds.length).equal(0);
+    expect(contest.winnerRewardAllocation.length).equal(numWinners);
+    for (let i = 0; i < numWinners; i++) {
+      expect(contest.winnerRewardAllocation[i]).equal(
+        winnerRewardAllocation[i]
+      );
+    }
   });
 });

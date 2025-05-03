@@ -5,6 +5,7 @@ use anchor_spl::token::Mint;
 use crate::state::config::Config;
 use crate::state::contest::TokenDraftContest;
 use crate::state::entry::{TokenDraftContestEntry, TOTAL_CREDIT_PER_CONTEST};
+use crate::state::credit::TokenDraftContestCredits;
 use crate::errors::ContestError;
 
 #[derive(Accounts)]
@@ -29,6 +30,16 @@ pub struct EnterTokenDraftContest<'info> {
         bump,
     )]
     pub contest_entry: Account<'info, TokenDraftContestEntry>,
+
+    #[account(
+        mut,
+        realloc = contest_credits.to_account_info().data_len() + 32,
+        realloc::payer = signer,
+        realloc::zero = false,
+        seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
+        bump
+    )]
+    pub contest_credits: Account<'info, TokenDraftContestCredits>,
 
     #[account(mut)]
     pub mint: Account<'info, Mint>,
@@ -82,17 +93,18 @@ pub fn enter_token_draft_contest(
     let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
     transfer_checked(cpi_context, contest.entry_fee, ctx.accounts.mint.decimals)?;
 
-    
     // Update number of entries
     contest.num_entries += 1;
 
     // Create a new participation record
     let contest_entry = &mut ctx.accounts.contest_entry;
     contest_entry.user = ctx.accounts.signer.key();
-    contest_entry.entry_idx = contest.num_entries - 1;
-    contest_entry.contest = ctx.accounts.contest.key();
-    contest_entry.credit_allocation = credit_allocation;
-    
+    contest_entry.id = contest.num_entries - 1;
+    contest_entry.contest_key = ctx.accounts.contest.key();
+    contest_entry.credit_allocation = credit_allocation.clone();
+
+    // Append to credit allocation account
+    ctx.accounts.contest_credits.credit_allocations.append(&mut credit_allocation.clone());
 
     Ok(())
 }
