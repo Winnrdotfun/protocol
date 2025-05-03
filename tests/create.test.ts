@@ -9,6 +9,7 @@ import {
 import { Program } from "@coral-xyz/anchor";
 import { Protocol } from "../target/types/protocol";
 import {
+  createMint,
   hexToBase58,
   initializeProgram,
   pythPriceFeedIds,
@@ -35,8 +36,10 @@ describe.only("create", () => {
   });
 
   before(async () => {
-    const res = await initializeProgram({ program: pg, provider });
-    mint = res.mint;
+    mint = await createMint({ connection, owner: signer });
+    console.log("mint:", mint.toBase58());
+
+    const res = await initializeProgram({ program: pg, provider, mint });
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
   });
