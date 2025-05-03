@@ -47,4 +47,8 @@ impl TokenDraftContest {
         let current_time = Clock::get().unwrap().unix_timestamp as u64;
         current_time > self.end_time
     }
+
+    pub fn prize_pool(&self) -> u64 {
+        self.entry_fee * self.num_entries as u64
+    }
 }
