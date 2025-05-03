@@ -46,4 +46,8 @@ pub mod protocol {
     pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Result<()> {
         resolve::resolve_token_draft_contest(ctx)
     }
+
+    pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result<()> {
+        claim::claim_token_draft_contest(ctx)
+    }
 }

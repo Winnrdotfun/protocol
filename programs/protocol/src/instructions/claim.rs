@@ -3,7 +3,6 @@ use anchor_spl::token_interface::{TokenAccount, TokenInterface, TransferChecked,
 use anchor_spl::token::Mint;
 use crate::state::contest::TokenDraftContest;
 use crate::state::entry::TokenDraftContestEntry;
-use crate::state::credit::TokenDraftContestCredits;
 use crate::state::config::Config;
 use crate::errors::ContestError;
 
@@ -18,11 +17,7 @@ pub struct ClaimTokenDraftContest<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    #[account(
-        mut,
-        seeds = [b"token_draft_contest", contest.key().as_ref()],
-        bump
-    )]
+    #[account(mut)]
     pub contest: Account<'info, TokenDraftContest>,
 
     #[account(
@@ -31,16 +26,6 @@ pub struct ClaimTokenDraftContest<'info> {
         bump
     )]
     pub contest_entry: Account<'info, TokenDraftContestEntry>,
-
-    #[account(
-        mut,
-        realloc = contest_credits.to_account_info().data_len() + 32,
-        realloc::payer = signer,
-        realloc::zero = false,
-        seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
-        bump
-    )]
-    pub contest_credits: Account<'info, TokenDraftContestCredits>,
 
     #[account(mut)]
     pub mint: Account<'info, Mint>,
@@ -72,7 +57,7 @@ pub fn claim_token_draft_contest(
     let contest_entry = &mut ctx.accounts.contest_entry;
 
     // Check if the contest has already ended
-    require!(contest.has_ended(), ContestError::ContestNotEnded);
+    require!(contest.is_resolved, ContestError::ContestNotResolved);
 
     // Check if the user has already claimed their rewards
     require!(!contest_entry.has_claimed, ContestError::AlreadyClaimed);
@@ -93,8 +78,10 @@ pub fn claim_token_draft_contest(
         to: ctx.accounts.signer_token_account.to_account_info(),
         authority: ctx.accounts.program_token_account.to_account_info(),
     };
+    let mint_key = ctx.accounts.mint.key();
+    let signer_seeds: &[&[&[u8]]] = &[&[b"token_account", &mint_key.as_ref(), &[ctx.bumps.program_token_account]]];
     let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+    let cpi_context = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
     transfer_checked(cpi_context, reward_amount, ctx.accounts.mint.decimals)?;
 
     // Mark the entry as claimed

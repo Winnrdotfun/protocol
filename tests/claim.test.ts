@@ -4,13 +4,11 @@ import {
   web3,
   workspace,
   BN,
+  utils,
 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import {
-  InstructionWithEphemeralSigners,
-  PythSolanaReceiver,
-} from "@pythnetwork/pyth-solana-receiver";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import {
   Account,
   getOrCreateAssociatedTokenAccount,
@@ -24,6 +22,7 @@ import {
   enterContest,
   initializeProgram,
   pythPriceFeedIds,
+  resolveContest,
 } from "./helpers";
 
 describe.skip("claim", () => {
@@ -55,7 +54,12 @@ describe.skip("claim", () => {
     "https://hermes.pyth.network/",
     {}
   );
-  const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
+  const priceFeedIds = [
+    pythPriceFeedIds.bonk,
+    pythPriceFeedIds.popcat,
+    // pythPriceFeedIds.wif,
+    // pythPriceFeedIds.trump,
+  ];
 
   before(async () => {
     mint = await createMint({ connection, owner: signer });
@@ -91,6 +95,7 @@ describe.skip("claim", () => {
       );
     }
 
+    // Create a contest
     const currentTime = Math.floor(Date.now() / 1000);
     const startTime = new BN(currentTime + 60 * 60); // 1 hour from now
     const endTime = new BN(startTime.toNumber() + 60 * 60 * 24); // 1 day from now
@@ -100,7 +105,7 @@ describe.skip("claim", () => {
       entryFee: new BN(10 * LAMPORTS_PER_SOL),
       maxEntries: 100,
       priceFeedIds,
-      rewardAllocation: [25, 75],
+      rewardAllocation: [75, 25],
     };
     const createRes = await createContest({
       provider,
@@ -112,14 +117,13 @@ describe.skip("claim", () => {
     contestPda = createRes.contestPda;
     console.log("create:", createRes.txSignature);
 
-    // const creditAllocation = [35, 65];
+    // Create contest entry for users
     const creditAllocations = [
-      [25, 75], // -2.68 / -250
-      [50, 50], // -1.144 / -100
-      [40, 60], // -1.76 / -160
-      [75, 25], // 0.394 / 50 [3 1 2 0]
+      [25, 75],
+      [50, 50],
+      [40, 60],
+      [75, 25],
     ];
-
     for (let i = 0; i < creditAllocations.length; i++) {
       const { txSignature } = await enterContest({
         signer: signers[i],
@@ -135,82 +139,49 @@ describe.skip("claim", () => {
       console.log("enter:", txSignature);
     }
 
-    // const { txSignature } = await enterContest({
-    //   provider: provider,
-    //   program: pg,
-    //   configPda,
-    //   contestPda,
-    //   mint,
-    //   programTokenAccountPda,
-    //   signerTokenAccount,
-    //   creditAllocation,
-    // });
-    // console.log("enter:", txSignature);
+    // Resolve contest
+    const resolveRes = await resolveContest({
+      program: pg,
+      signer,
+      contestPda,
+      hermesClient: priceServiceConnection,
+      pythSolanaReceiver,
+    });
+    console.log("resolve:", resolveRes.txSignatures);
   });
 
   it("resolve a token draft contest", async () => {
-    const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
-    const timestamp = Math.floor(Date.now() / 1000) - 60 * 60 * 24; // 1 day ago
-    const priceUpdates =
-      await priceServiceConnection.getPriceUpdatesAtTimestamp(
-        timestamp,
-        priceFeedIds,
-        { encoding: "base64" }
-      );
-    const priceUpdatesData = priceUpdates.binary.data;
-    const txBuilder = pythSolanaReceiver.newTransactionBuilder({
-      closeUpdateAccounts: true,
-    });
-    await txBuilder.addPostPriceUpdates(priceUpdatesData);
-    await txBuilder.addPriceConsumerInstructions(
-      async (getPriceUpdateAccount) => {
-        const priceUpdateAccounts = priceFeedIds.map((id) =>
-          getPriceUpdateAccount(id)
-        );
-
-        const txInstruction = await pg.methods
-          .resolveTokenDraftContest()
-          .accounts({
-            signer: signer.publicKey,
-            contest: contestPda,
-            feed0: priceUpdateAccounts[0],
-            feed1: priceUpdateAccounts[1] || null,
-            feed2: priceUpdateAccounts[2] || null,
-            feed3: priceUpdateAccounts[3] || null,
-            feed4: priceUpdateAccounts[4] || null,
-          })
-          .instruction();
-
-        const instruction: InstructionWithEphemeralSigners = {
-          instruction: txInstruction,
-          signers: [signer],
-        };
-
-        return [instruction];
-      }
-    );
-
-    const versionedTxs = await txBuilder.buildVersionedTransactions({
-      computeUnitPriceMicroLamports: 50000,
-    });
-
-    const sigs = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
-      skipPreflight: false,
-    });
-    console.log("signatures:==", sigs);
-
-    // const tx = await connection.getTransaction(sigs[2], {
-    //   commitment: "confirmed",
-    //   maxSupportedTransactionVersion: 0,
-    // });
-    // // console.log("tx:", tx);
-    // console.log("logs:", tx?.meta?.logMessages);
-
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
-    console.log("contest:", contest);
-    // const contestEntry = await pg.account.tokenDraftContestEntry.fetch(
-    //   contestEntryPda
-    // );
-    // expect(contest.isResolved).equal(true);
+    const winnerIds = contest.winnerIds;
+
+    for (const winnerId of winnerIds) {
+      const signer = signers[winnerId];
+      const [contestEntryPda] = web3.PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("token_draft_contest_entry"),
+          contestPda.toBuffer(),
+          signer.publicKey.toBuffer(),
+        ],
+        programId
+      );
+
+      const accounts = {
+        signer: signer.publicKey,
+        config: configPda,
+        contest: contestPda,
+        contestEntry: contestEntryPda,
+        mint,
+        programTokenAccount: programTokenAccountPda,
+        signerTokenAccount: signerTokenAccounts[winnerId].address,
+        tokenProgram: utils.token.TOKEN_PROGRAM_ID,
+      };
+
+      const txSignature = await pg.methods
+        .claimTokenDraftContest()
+        .accounts(accounts)
+        .signers([signer])
+        .rpc();
+      console.log("claim:", txSignature);
+    }
   });
 });
