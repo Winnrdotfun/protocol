@@ -14,7 +14,7 @@ import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 
 const { PublicKey } = web3;
 
-describe.skip("create", () => {
+describe.only("create", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;
@@ -59,7 +59,12 @@ describe.skip("create", () => {
     const endTime = new BN(startTime.toNumber() + 60 * 60 * 24); // 1 day from now
     const entryFee = new BN(10 * LAMPORTS_PER_SOL);
     const maxEntries = 100;
-    const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
+    const priceFeedIds = [
+      pythPriceFeedIds.bonk,
+      pythPriceFeedIds.popcat,
+      pythPriceFeedIds.wif,
+      pythPriceFeedIds.trump,
+    ];
     const tokenFeedIds = priceFeedIds.map((v) => new PublicKey(hexToBase58(v)));
     const feedAccounts = priceFeedIds.map((v) =>
       pythSolanaReceiver.getPriceFeedAccountAddress(0, v)

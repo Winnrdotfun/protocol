@@ -26,7 +26,7 @@ import {
   pythPriceFeedIds,
 } from "./helpers";
 
-describe.skip("resolve", () => {
+describe.skip("claim", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;
@@ -90,24 +90,6 @@ describe.skip("resolve", () => {
         10000 * LAMPORTS_PER_SOL
       );
     }
-
-    const signerTokenAccount = signerTokenAccounts[0];
-
-    // signerTokenAccount = await getOrCreateAssociatedTokenAccount(
-    //   connection,
-    //   signer,
-    //   mint,
-    //   signer.publicKey
-    // );
-
-    // await mintTo(
-    //   connection,
-    //   signer,
-    //   mint,
-    //   signerTokenAccount.address,
-    //   signer,
-    //   10000 * LAMPORTS_PER_SOL
-    // );
 
     const currentTime = Math.floor(Date.now() / 1000);
     const startTime = new BN(currentTime + 60 * 60); // 1 hour from now
@@ -217,12 +199,12 @@ describe.skip("resolve", () => {
     });
     console.log("signatures:==", sigs);
 
-    const tx = await connection.getTransaction(sigs[2], {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    });
-    // console.log("tx:", tx);
-    console.log("logs:", tx?.meta?.logMessages);
+    // const tx = await connection.getTransaction(sigs[2], {
+    //   commitment: "confirmed",
+    //   maxSupportedTransactionVersion: 0,
+    // });
+    // // console.log("tx:", tx);
+    // console.log("logs:", tx?.meta?.logMessages);
 
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
     console.log("contest:", contest);
