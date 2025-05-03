@@ -7,9 +7,13 @@ import {
   BN,
 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Protocol } from "../target/types/protocol";
-import { hexToBase58, initializeProgram, pythPriceFeedIds } from "./helpers";
+import {
+  hexToBase58,
+  initializeProgram,
+  pythPriceFeedIds,
+  UNITS_PER_USDC,
+} from "./helpers";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 
 const { PublicKey } = web3;
@@ -57,7 +61,7 @@ describe.only("create", () => {
     const currentTime = Math.floor(Date.now() / 1000);
     const startTime = new BN(currentTime + 60 * 60); // 1 hour from now
     const endTime = new BN(startTime.toNumber() + 60 * 60 * 24); // 1 day from now
-    const entryFee = new BN(10 * LAMPORTS_PER_SOL);
+    const entryFee = new BN(10 * UNITS_PER_USDC);
     const maxEntries = 100;
     const priceFeedIds = [
       pythPriceFeedIds.bonk,

@@ -78,5 +78,8 @@ export const hexToBase58 = (hex: string) => {
   return utils.bytes.bs58.encode(buffer);
 };
 
+export const USDC_DECIMALS = 6;
+export const UNITS_PER_USDC = 10 ** USDC_DECIMALS;
+
 export * from "./pyth";
 export * from "./contest";

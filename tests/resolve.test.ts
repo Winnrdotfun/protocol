@@ -24,6 +24,7 @@ import {
   enterContest,
   initializeProgram,
   pythPriceFeedIds,
+  UNITS_PER_USDC,
 } from "./helpers";
 
 describe.skip("resolve", () => {
@@ -87,7 +88,7 @@ describe.skip("resolve", () => {
         mint,
         acc.address,
         signer,
-        10000 * LAMPORTS_PER_SOL
+        10000 * UNITS_PER_USDC
       );
     }
 

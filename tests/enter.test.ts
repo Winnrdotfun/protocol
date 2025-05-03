@@ -17,7 +17,12 @@ import {
   mintTo,
 } from "@solana/spl-token";
 import { Protocol } from "../target/types/protocol";
-import { createContest, initializeProgram, pythPriceFeedIds } from "./helpers";
+import {
+  createContest,
+  initializeProgram,
+  pythPriceFeedIds,
+  UNITS_PER_USDC,
+} from "./helpers";
 
 const { PublicKey } = web3;
 
@@ -61,7 +66,7 @@ describe.skip("enter", () => {
       mint,
       signerTokenAccount.address,
       signer,
-      10000 * LAMPORTS_PER_SOL
+      10000 * UNITS_PER_USDC
     );
 
     const currentTime = Math.floor(Date.now() / 1000);
@@ -70,7 +75,7 @@ describe.skip("enter", () => {
     const contestParams = {
       startTime,
       endTime,
-      entryFee: new BN(10 * LAMPORTS_PER_SOL),
+      entryFee: new BN(10 * UNITS_PER_USDC),
       maxEntries: 100,
       priceFeedIds: [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat],
       rewardAllocation: [50, 50],

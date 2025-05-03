@@ -1,8 +1,12 @@
 import { AnchorProvider, BN, Program, utils, web3 } from "@coral-xyz/anchor";
-import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import {
+  InstructionWithEphemeralSigners,
+  PythSolanaReceiver,
+} from "@pythnetwork/pyth-solana-receiver";
 import { Protocol } from "../../target/types/protocol";
 import { hexToBase58 } from "../helpers";
 import { Account } from "@solana/spl-token";
+import { HermesClient } from "@pythnetwork/hermes-client";
 
 const { PublicKey } = web3;
 
@@ -149,53 +153,69 @@ export const enterContest = async (args: {
   return { txSignature, contestEntryPda, contestCreditsPda };
 };
 
-// export const enterContest = async (args: {
-//   provider: AnchorProvider;
-//   program: Program<Protocol>;
-//   configPda: web3.PublicKey;
-//   contestPda: web3.PublicKey;
-//   programTokenAccountPda: web3.PublicKey;
-//   mint: web3.PublicKey;
-//   signerTokenAccount: web3.PublicKey;
-//   creditAllocation: number[];
-// }) => {
-//   const {
-//     provider,
-//     program: pg,
-//     contestPda,
-//     mint,
-//     signerTokenAccount,
-//     creditAllocation,
-//   } = args;
-//   const wallet = provider.wallet;
-//   const signer = wallet.payer;
-//   const programId = pg.programId;
+export const resolveContest = async (args: {
+  program: Program<Protocol>;
+  signer: web3.Keypair;
+  hermesClient: HermesClient;
+  pythSolanaReceiver: PythSolanaReceiver;
+  contestPda: web3.PublicKey;
+}) => {
+  const { program, signer, contestPda, hermesClient, pythSolanaReceiver } =
+    args;
+  const contest = await program.account.tokenDraftContest.fetch(contestPda);
 
-//   const [contestEntryPda] = PublicKey.findProgramAddressSync(
-//     [
-//       Buffer.from("token_draft_contest_entry"),
-//       contestPda.toBuffer(),
-//       signer.publicKey.toBuffer(),
-//     ],
-//     programId
-//   );
+  const priceFeedIds = contest.tokenFeedIds.map(
+    (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
+  );
 
-//   const accounts = {
-//     signer: signer.publicKey,
-//     config: args.configPda,
-//     contest: contestPda,
-//     contestEntry: contestEntryPda,
-//     mint,
-//     programTokenAccount: args.configPda,
-//     signerTokenAccount,
-//     tokenProgram: utils.token.TOKEN_PROGRAM_ID,
-//   };
+  // const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
+  const endTimestamp = Math.floor(Date.now() / 1000) - 60 * 60 * 24; // 1 day ago
+  // const endTimestamp = contest.endTime.toNumber();
+  const priceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
+    endTimestamp,
+    priceFeedIds,
+    { encoding: "base64" }
+  );
+  const priceUpdatesData = priceUpdates.binary.data;
+  const txBuilder = pythSolanaReceiver.newTransactionBuilder({
+    closeUpdateAccounts: true,
+  });
+  await txBuilder.addPostPriceUpdates(priceUpdatesData);
+  await txBuilder.addPriceConsumerInstructions(
+    async (getPriceUpdateAccount) => {
+      const priceUpdateAccounts = priceFeedIds.map((id) =>
+        getPriceUpdateAccount(id)
+      );
 
-//   const txSignature = await pg.methods
-//     .enterTokenDraftContest(Buffer.from(creditAllocation))
-//     .accounts(accounts)
-//     .signers([signer])
-//     .rpc();
+      const txInstruction = await program.methods
+        .resolveTokenDraftContest()
+        .accounts({
+          signer: signer.publicKey,
+          contest: contestPda,
+          feed0: priceUpdateAccounts[0],
+          feed1: priceUpdateAccounts[1] || null,
+          feed2: priceUpdateAccounts[2] || null,
+          feed3: priceUpdateAccounts[3] || null,
+          feed4: priceUpdateAccounts[4] || null,
+        })
+        .instruction();
 
-//   return { txSignature, contestEntryPda };
-// };
+      const instruction: InstructionWithEphemeralSigners = {
+        instruction: txInstruction,
+        signers: [signer],
+      };
+
+      return [instruction];
+    }
+  );
+
+  const versionedTxs = await txBuilder.buildVersionedTransactions({
+    computeUnitPriceMicroLamports: 50000,
+  });
+
+  const txSignatures = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
+    skipPreflight: false,
+  });
+
+  return { txSignatures };
+};
