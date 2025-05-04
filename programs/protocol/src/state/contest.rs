@@ -10,7 +10,7 @@ pub struct TokenDraftContest {
     pub creator: Pubkey,
 
     pub start_time: u64,
-    
+
     pub end_time: u64,
 
     pub entry_fee: u64,
@@ -48,7 +48,7 @@ impl TokenDraftContest {
         current_time > self.end_time
     }
 
-    pub fn prize_pool(&self) -> u64 {
+    pub fn pool_amount(&self) -> u64 {
         self.entry_fee * self.num_entries as u64
     }
 }

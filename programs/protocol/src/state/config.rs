@@ -5,5 +5,4 @@ use anchor_lang::prelude::*;
 pub struct Config {
     pub admin: Pubkey,
     pub mint: Pubkey,
-    pub is_initialized: bool,
 }
