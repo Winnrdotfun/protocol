@@ -104,7 +104,7 @@ describe.skip("claim", () => {
     console.log("resolve:", resolveRes.txSignatures);
   });
 
-  it("resolve a token draft contest", async () => {
+  it("claim a token draft contest reward", async () => {
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
     const winnerIds = contest.winnerIds;
 
