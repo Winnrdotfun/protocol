@@ -1,12 +1,14 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{TokenAccount, TokenInterface, TransferChecked, transfer_checked};
 use anchor_spl::token::Mint;
+use anchor_spl::token_interface::{
+    transfer_checked, TokenAccount, TokenInterface, TransferChecked,
+};
 
+use crate::errors::ContestError;
 use crate::state::config::Config;
 use crate::state::contest::TokenDraftContest;
-use crate::state::entry::{TokenDraftContestEntry, TOTAL_CREDIT_PER_CONTEST};
 use crate::state::credit::TokenDraftContestCredits;
-use crate::errors::ContestError;
+use crate::state::entry::{TokenDraftContestEntry, TOTAL_CREDIT_PER_CONTEST};
 
 #[derive(Accounts)]
 pub struct EnterTokenDraftContest<'info> {
@@ -47,10 +49,10 @@ pub struct EnterTokenDraftContest<'info> {
     #[account(
         mut,
         token::mint = mint,
-        seeds = [b"token_account", mint.key().to_bytes().as_ref()],
+        seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub program_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -75,19 +77,28 @@ pub fn enter_token_draft_contest(
     require!(contest.is_entry_active(), ContestError::EntryClosed);
 
     // Check if the contest is already full
-    require!(contest.num_entries <= contest.max_entries, ContestError::AlreadyFull);
+    require!(
+        contest.num_entries <= contest.max_entries,
+        ContestError::AlreadyFull
+    );
 
     // Check if allocation is valid
     let sum_credits: u8 = credit_allocation.iter().sum();
-    require!(sum_credits == TOTAL_CREDIT_PER_CONTEST, ContestError::InvalidDraftTokenDistribution);
-    require!(contest.token_feed_ids.len() == credit_allocation.len(), ContestError::InvalidDraftTokenDistribution);
+    require!(
+        sum_credits == TOTAL_CREDIT_PER_CONTEST,
+        ContestError::InvalidDraftTokenDistribution
+    );
+    require!(
+        contest.token_feed_ids.len() == credit_allocation.len(),
+        ContestError::InvalidDraftTokenDistribution
+    );
 
     // Transfer entry fee from the user's token account to the program's token account
     let cpi_accounts = TransferChecked {
         mint: ctx.accounts.mint.to_account_info(),
         from: ctx.accounts.signer_token_account.to_account_info(),
-        to: ctx.accounts.program_token_account.to_account_info(),
-        authority: ctx.accounts.signer.to_account_info()
+        to: ctx.accounts.escrow_token_account.to_account_info(),
+        authority: ctx.accounts.signer.to_account_info(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();
     let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
@@ -104,7 +115,10 @@ pub fn enter_token_draft_contest(
     contest_entry.credit_allocation = credit_allocation.clone();
 
     // Append to credit allocation account
-    ctx.accounts.contest_credits.credit_allocations.append(&mut credit_allocation.clone());
+    ctx.accounts
+        .contest_credits
+        .credit_allocations
+        .append(&mut credit_allocation.clone());
 
     Ok(())
 }
