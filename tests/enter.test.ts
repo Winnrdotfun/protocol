@@ -8,21 +8,11 @@ import {
   utils,
 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import {
-  Account,
-  getAccount,
-  getOrCreateAssociatedTokenAccount,
-  mintTo,
-} from "@solana/spl-token";
+import { Account, getAccount } from "@solana/spl-token";
 import { Protocol } from "../target/types/protocol";
-import {
-  createContest,
-  initializeProgram,
-  pythPriceFeedIds,
-  UNITS_PER_USDC,
-} from "./helpers";
+import { pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
+import { fixtureWithContest } from "./fixtures";
 
 const { PublicKey } = web3;
 
@@ -30,67 +20,51 @@ describe.skip("enter", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;
-  const wallet = provider.wallet;
-  const signer = wallet.payer;
   const pg = workspace.Protocol as Program<Protocol>;
   const programId = pg.programId;
+
   let mint: web3.PublicKey;
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
   let contestPda: web3.PublicKey;
   let programTokenAccountPda: web3.PublicKey;
-  let signerTokenAccount: Account;
-  const pythSolanaReceiver = new PythSolanaReceiver({
-    connection,
-    wallet: wallet as any,
-  });
+  let signers: web3.Keypair[];
+  let signerTokenAccounts: Account[];
+  let pythSolanaReceiver: PythSolanaReceiver;
+  let contestParams;
 
   before(async () => {
-    // Initialize the program
-    const initRes = await initializeProgram({ program: pg, provider });
-    mint = initRes.mint;
-    configPda = initRes.configPda;
-    contestMetadataPda = initRes.contestMetadataPda;
-    programTokenAccountPda = initRes.programTokenAccountPda;
-
-    // Mint tokens
-    signerTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      signer,
-      mint,
-      signer.publicKey
-    );
-    await mintTo(
-      connection,
-      signer,
-      mint,
-      signerTokenAccount.address,
-      signer,
-      10000 * UNITS_PER_USDC
-    );
-
     const currentTime = Math.floor(Date.now() / 1000);
-    const startTime = new BN(currentTime + 60 * 60); // 1 hour from now
-    const endTime = new BN(startTime.toNumber() + 60 * 60 * 24); // 1 day from now
-    const contestParams = {
+    const startTime = currentTime + 60 * 60; // 1 hour from now
+    const endTime = startTime + 60 * 60 * 24; // 1 day from now
+    contestParams = {
       startTime,
       endTime,
-      entryFee: new BN(10 * UNITS_PER_USDC),
+      entryFee: BigInt(10 * UNITS_PER_USDC),
       maxEntries: 100,
       priceFeedIds: [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat],
       rewardAllocation: [50, 50],
     };
-    const createRes = await createContest({
+
+    const res = await fixtureWithContest({
       provider,
       program: pg,
-      contestMetadataPda,
-      pythSolanaReceiver,
       contestParams,
     });
-    contestPda = createRes.contestPda;
+    signers = res.signers;
+    mint = res.mint;
+    configPda = res.configPda;
+    contestMetadataPda = res.contestMetadataPda;
+    contestPda = res.contestPda;
+    programTokenAccountPda = res.programTokenAccountPda;
+    pythSolanaReceiver = res.pythSolanaReceiver;
+    signerTokenAccounts = res.signerTokenAccounts;
   });
 
   it("enter a token draft contest", async () => {
+    const signer = signers[0];
+    const signerTokenAccount = signerTokenAccounts[0];
+
     const [contestEntryPda] = PublicKey.findProgramAddressSync(
       [
         Buffer.from("token_draft_contest_entry"),
@@ -118,7 +92,6 @@ describe.skip("enter", () => {
 
     const creditAllocation = [35, 65];
     const creditAllocationInput = Buffer.from(creditAllocation);
-    // console.log("creditAllocationInput:", creditAllocationInput);
     const txSignature = await pg.methods
       .enterTokenDraftContest(creditAllocationInput)
       .accounts(accounts)
@@ -131,20 +104,12 @@ describe.skip("enter", () => {
       connection,
       programTokenAccountPda
     );
-    console.log(
-      "programTokenAccount.address:",
-      programTokenAccount.address.toBase58()
-    );
-    console.log(
-      "programTokenAccount.amount:",
-      programTokenAccount.amount.toString()
-    );
 
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
     const contestEntry = await pg.account.tokenDraftContestEntry.fetch(
       contestEntryPda
     );
-    // console.log("Contest entry:", contestEntry);
+
     expect(contest.numEntries).equal(1);
     expect(contestEntry.id).equal(0);
     expect(contestEntry.user.toBase58()).equal(signer.publicKey.toBase58());
@@ -155,13 +120,13 @@ describe.skip("enter", () => {
     }
     expect(contestEntry.hasClaimed).equal(false);
     expect(programTokenAccount.amount.toString()).equal(
-      new BN(10 * LAMPORTS_PER_SOL).toString()
+      new BN(10 * UNITS_PER_USDC).toString()
     );
 
     const contestCredits = await pg.account.tokenDraftContestCredits.fetch(
       contestCreditsPda
     );
-    expect(contestCredits.contest.toBase58()).equal(contestPda.toBase58());
+    expect(contestCredits.contestKey.toBase58()).equal(contestPda.toBase58());
     for (let i = 0; i < creditAllocation.length; i++) {
       expect(creditAllocation[i]).equal(contestCredits.creditAllocations[i]);
     }

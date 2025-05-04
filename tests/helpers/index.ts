@@ -1,6 +1,6 @@
 import { AnchorProvider, Program, utils, web3 } from "@coral-xyz/anchor";
 import { createMint as createSplMint } from "@solana/spl-token";
-import { Protocol } from "../../target/types/protocol";
+import { Protocol as IWinnr } from "../../target/types/protocol";
 
 const { PublicKey } = web3;
 
@@ -20,19 +20,15 @@ export const createMint = async (args: {
 };
 
 export const initializeProgram = async (args: {
-  program: Program<Protocol>;
+  program: Program<IWinnr>;
   provider: AnchorProvider;
-  mint?: web3.PublicKey;
+  mint: web3.PublicKey;
 }) => {
-  const { provider, program: pg } = args;
-  let mint = args.mint;
+  const { provider, program: pg, mint } = args;
+
   const connection = provider.connection;
   const signer = provider.wallet.payer;
   const programId = pg.programId;
-
-  if (!mint) {
-    mint = await createMint({ connection, owner: signer });
-  }
 
   const [configPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("config")],
@@ -65,7 +61,6 @@ export const initializeProgram = async (args: {
 
   return {
     txSignature,
-    mint,
     configPda,
     contestMetadataPda,
     programTokenAccountPda,

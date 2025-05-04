@@ -93,7 +93,6 @@ export const createContest = async (args: {
 };
 
 export const enterContest = async (args: {
-  //   provider: AnchorProvider;
   signer: web3.Keypair;
   program: Program<Protocol>;
   configPda: web3.PublicKey;
@@ -106,7 +105,6 @@ export const enterContest = async (args: {
   const {
     contestPda,
     program,
-    // provider,
     signer,
     configPda,
     mint,
@@ -115,8 +113,6 @@ export const enterContest = async (args: {
     creditAllocation,
   } = args;
   const programId = program.programId;
-  //   const signer = provider.wallet.payer;
-
   const [contestEntryPda] = PublicKey.findProgramAddressSync(
     [
       Buffer.from("token_draft_contest_entry"),
@@ -143,7 +139,6 @@ export const enterContest = async (args: {
   };
 
   const creditAllocationInput = Buffer.from(creditAllocation);
-  // console.log("creditAllocationInput:", creditAllocationInput);
   const txSignature = await program.methods
     .enterTokenDraftContest(creditAllocationInput)
     .accounts(accounts)

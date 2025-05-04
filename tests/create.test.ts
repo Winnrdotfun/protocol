@@ -8,43 +8,35 @@ import {
 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Protocol } from "../target/types/protocol";
-import {
-  createMint,
-  hexToBase58,
-  initializeProgram,
-  pythPriceFeedIds,
-  UNITS_PER_USDC,
-} from "./helpers";
+import { hexToBase58, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import { fixtureBase } from "./fixtures";
 
 const { PublicKey } = web3;
 
 describe.only("create", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
-  const connection = provider.connection;
-  const wallet = provider.wallet;
-  const signer = wallet.payer;
   const pg = workspace.Protocol as Program<Protocol>;
   const programId = pg.programId;
   let mint: web3.PublicKey;
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
-  const pythSolanaReceiver = new PythSolanaReceiver({
-    connection,
-    wallet: wallet as any,
-  });
+  let signers: web3.Keypair[];
+  let pythSolanaReceiver: PythSolanaReceiver;
 
   before(async () => {
-    mint = await createMint({ connection, owner: signer });
-    console.log("mint:", mint.toBase58());
-
-    const res = await initializeProgram({ program: pg, provider, mint });
+    const res = await fixtureBase({ provider, program: pg });
+    signers = res.signers;
+    mint = res.mint;
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
+    pythSolanaReceiver = res.pythSolanaReceiver;
+    console.log("mint", mint.toBase58());
   });
 
   it("create a token draft contest", async () => {
+    const signer = signers[0];
     const contestMetadata = await pg.account.contestMetadata.fetch(
       contestMetadataPda
     );
@@ -56,7 +48,7 @@ describe.only("create", () => {
       ],
       programId
     );
-    const [creditsPda] = PublicKey.findProgramAddressSync(
+    const [contestCreditsPda] = PublicKey.findProgramAddressSync(
       [Buffer.from("token_draft_contest_credits"), contestPda.toBuffer()],
       programId
     );
@@ -76,7 +68,6 @@ describe.only("create", () => {
     const feedAccounts = priceFeedIds.map((v) =>
       pythSolanaReceiver.getPriceFeedAccountAddress(0, v)
     );
-    // feedAccounts.map((acc) => console.log("acc:", acc.toBase58()));
     const winnerRewardAllocation = [40, 20, 20, 10, 10];
     const numWinners = winnerRewardAllocation.length;
 
@@ -84,7 +75,7 @@ describe.only("create", () => {
       signer: signer.publicKey,
       contestMetadata: contestMetadataPda,
       contest: contestPda,
-      credits: creditsPda,
+      contestCredits: contestCreditsPda,
       feed0: feedAccounts[0],
       feed1: feedAccounts[1] || null,
       feed2: feedAccounts[2] || null,
@@ -105,12 +96,13 @@ describe.only("create", () => {
       .signers([signer])
       .rpc();
     console.log("Tx signature:", sig);
+    console.log("Contest PDA:", contestPda.toBase58());
 
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
     const contestCredits = await pg.account.tokenDraftContestCredits.fetch(
-      creditsPda
+      contestCreditsPda
     );
-    console.log("Contest account:", contest);
+
     expect(contest.id.toNumber()).equal(
       contestMetadata.tokenDraftContestCount.toNumber()
     );
@@ -128,7 +120,7 @@ describe.only("create", () => {
     }
     expect(contest.tokenStartPrices.length).equal(tokenFeedIds.length);
     expect(contest.tokenRois.length).equal(0);
-    expect(contestCredits.contest.toBase58()).equal(contestPda.toBase58());
+    expect(contestCredits.contestKey.toBase58()).equal(contestPda.toBase58());
     expect(contestCredits.creditAllocations.length).equal(0);
     expect(contest.winnerIds.length).equal(0);
     expect(contest.winnerRewardAllocation.length).equal(numWinners);
