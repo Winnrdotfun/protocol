@@ -33,7 +33,7 @@ pub struct CreateTokenDraftContest<'info> {
         seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
         bump
     )]
-    pub credits: Account<'info, TokenDraftContestCredits>,
+    pub contest_credits: Account<'info, TokenDraftContestCredits>,
 
     pub feed0: Option<Account<'info, PriceUpdateV2>>,
     pub feed1: Option<Account<'info, PriceUpdateV2>>,
@@ -96,8 +96,8 @@ pub fn create_token_draft_contest(
     contest.is_resolved = false;
 
     // Initialize credit data
-    ctx.accounts.credits.contest = contest.key();
-    ctx.accounts.credits.credit_allocations = Vec::new();
+    ctx.accounts.contest_credits.contest_key = contest.key();
+    ctx.accounts.contest_credits.credit_allocations = Vec::new();
 
     // Initialize winner data
     ctx.accounts.contest.winner_ids = Vec::new();
