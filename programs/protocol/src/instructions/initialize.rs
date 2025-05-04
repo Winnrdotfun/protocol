@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::errors::ConfigError;
 use crate::state::config::Config;
 use crate::state::metadata::ContestMetadata;
-use crate::errors::ConfigError;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -34,12 +34,23 @@ pub struct Initialize<'info> {
         init,
         payer = signer,
         token::mint = mint,
-        token::authority = token_account,
+        token::authority = escrow_token_account,
         token::token_program = token_program,
-        seeds = [b"token_account", mint.key().to_bytes().as_ref()],
+        seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = signer,
+        token::mint = mint,
+        token::authority = fee_token_account,
+        token::token_program = token_program,
+        seeds = [b"fee_token_account", mint.key().to_bytes().as_ref()],
+        bump
+    )]
+    pub fee_token_account: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
 
@@ -48,13 +59,16 @@ pub struct Initialize<'info> {
 
 pub fn initialize(ctx: Context<Initialize>, token_draft_contest_fee_percent: u8) -> Result<()> {
     let config = &mut ctx.accounts.config;
-    require!(!config.is_initialized, ConfigError::AlreadyInitialized);
+
+    require!(
+        token_draft_contest_fee_percent < 100,
+        ConfigError::InvalidFeePercent
+    );
 
     let contest_metadata = &mut ctx.accounts.contest_metadata;
 
     config.admin = ctx.accounts.signer.key();
     config.mint = ctx.accounts.mint.key();
-    config.is_initialized = true;
 
     contest_metadata.token_draft_contest_count = 0;
     contest_metadata.token_draft_contest_fee_percent = token_draft_contest_fee_percent;
