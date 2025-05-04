@@ -122,8 +122,14 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
         to: ctx.accounts.fee_token_account.to_account_info(),
         authority: ctx.accounts.escrow_token_account.to_account_info(),
     };
+    let mint_key = ctx.accounts.mint.key();
+    let signer_seeds: &[&[&[u8]]] = &[&[
+        b"escrow_token_account",
+        &mint_key.as_ref(),
+        &[ctx.bumps.escrow_token_account],
+    ]];
     let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+    let cpi_context = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
     transfer_checked(cpi_context, fee_amount, ctx.accounts.mint.decimals)?;
 
     Ok(())

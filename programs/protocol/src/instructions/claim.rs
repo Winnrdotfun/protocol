@@ -107,7 +107,7 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     };
     let mint_key = ctx.accounts.mint.key();
     let signer_seeds: &[&[&[u8]]] = &[&[
-        b"token_account",
+        b"escrow_token_account",
         &mint_key.as_ref(),
         &[ctx.bumps.escrow_token_account],
     ]];
