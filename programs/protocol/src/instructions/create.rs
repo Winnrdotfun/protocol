@@ -1,9 +1,9 @@
-use anchor_lang::prelude::*;
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use crate::errors::ContestError;
 use crate::state::contest::{TokenDraftContest, MAX_TOKEN_PER_DRAFT};
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
-use crate::errors::ContestError;
+use anchor_lang::prelude::*;
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 #[derive(Accounts)]
 pub struct CreateTokenDraftContest<'info> {
@@ -62,11 +62,16 @@ pub fn create_token_draft_contest(
     // Contest must end later than it starts
     require!(end_time > start_time, ContestError::InvalidDuration);
 
-    // Number of winners must be greater than 0 and less than or equal to max_entries
-    // require!(num_winners > 0 && num_winners <= max_entries, ContestError::InvalidWinnersCount);
+    // Reward allocation must be sorted in descending order and sum to 100
+    let is_allocation_good = reward_allocation.is_sorted_by(|a, b| a >= b)
+        && reward_allocation.iter().sum::<u8>() == 100u8;
+    require!(is_allocation_good, ContestError::InvalidRewardAllocation);
 
     // At least one token must be selected for the draft and no more than MAX_TOKEN_PER_DRAFT
-    require!(token_feed_ids.len() > 0 && token_feed_ids.len() <= MAX_TOKEN_PER_DRAFT, ContestError::InvalidDraftTokenCount);
+    require!(
+        token_feed_ids.len() > 0 && token_feed_ids.len() <= MAX_TOKEN_PER_DRAFT,
+        ContestError::InvalidDraftTokenCount
+    );
 
     // Set start prices for each token
     let feed_accounts: Vec<&Option<Account<'_, PriceUpdateV2>>> = vec![
@@ -75,7 +80,7 @@ pub fn create_token_draft_contest(
         &ctx.accounts.feed2,
         &ctx.accounts.feed3,
         &ctx.accounts.feed4,
-        ];
+    ];
     let clock = Clock::get()?;
     contest.token_start_prices = Vec::new();
     for (i, feed_id) in token_feed_ids.iter().enumerate() {
@@ -85,7 +90,7 @@ pub fn create_token_draft_contest(
         contest.token_start_prices.push(price);
     }
 
-    // Set contest parameters 
+    // Set contest parameters
     contest.id = ctx.accounts.contest_metadata.token_draft_contest_count;
     contest.creator = ctx.accounts.signer.key();
     contest.start_time = start_time;
@@ -106,7 +111,11 @@ pub fn create_token_draft_contest(
     Ok(())
 }
 
-fn get_token_price(clock: &Clock, _feed_id: &Pubkey, feed: &Account<'_, PriceUpdateV2>) -> Result<f64> {
+fn get_token_price(
+    clock: &Clock,
+    _feed_id: &Pubkey,
+    feed: &Account<'_, PriceUpdateV2>,
+) -> Result<f64> {
     let maximum_age = 60;
     let feed_id = _feed_id.to_bytes();
     // let price_data = feed.get_price_no_older_than(clock, maximum_age, &feed_id)?;
