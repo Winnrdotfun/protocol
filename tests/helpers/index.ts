@@ -22,11 +22,11 @@ export const createMint = async (args: {
 export const initializeProgram = async (args: {
   program: Program<IWinnr>;
   provider: AnchorProvider;
-  mint: web3.PublicKey;
+  initParams: { mint: web3.PublicKey; tokenDraftContestFeePercent: number };
 }) => {
-  const { provider, program: pg, mint } = args;
+  const { provider, program: pg, initParams } = args;
+  const { mint, tokenDraftContestFeePercent } = initParams;
 
-  const connection = provider.connection;
   const signer = provider.wallet.payer;
   const programId = pg.programId;
 
@@ -54,7 +54,7 @@ export const initializeProgram = async (args: {
   };
 
   const txSignature = await pg.methods
-    .initialize()
+    .initialize(tokenDraftContestFeePercent)
     .accounts(accounts)
     .signers([signer])
     .rpc();

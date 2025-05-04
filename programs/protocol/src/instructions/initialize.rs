@@ -46,14 +46,18 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+pub fn initialize(ctx: Context<Initialize>, token_draft_contest_fee_percent: u8) -> Result<()> {
     let config = &mut ctx.accounts.config;
     require!(!config.is_initialized, ConfigError::AlreadyInitialized);
+
+    let contest_metadata = &mut ctx.accounts.contest_metadata;
 
     config.admin = ctx.accounts.signer.key();
     config.mint = ctx.accounts.mint.key();
     config.is_initialized = true;
-    ctx.accounts.contest_metadata.token_draft_contest_count = 0;
+
+    contest_metadata.token_draft_contest_count = 0;
+    contest_metadata.token_draft_contest_fee_percent = token_draft_contest_fee_percent;
 
     Ok(())
 }

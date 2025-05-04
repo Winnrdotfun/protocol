@@ -12,8 +12,8 @@ declare_id!("E35TzkfrR1LoNEevvRFK9frvrFQgSGxN251rvpVrzW2");
 pub mod protocol {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        initialize::initialize(ctx)
+    pub fn initialize(ctx: Context<Initialize>, token_draft_contest_fee_percent: u8) -> Result<()> {
+        initialize::initialize(ctx, token_draft_contest_fee_percent)
     }
 
     pub fn create_token_draft_contest(

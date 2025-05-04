@@ -22,6 +22,7 @@ export const fixtureBase = async (args: {
 }) => {
   const { provider, program } = args;
   const connection = provider.connection;
+  const tokenDraftContestFeePercent = 10;
 
   // Create multiple test signers
   const wallet = provider.wallet;
@@ -75,7 +76,7 @@ export const fixtureBase = async (args: {
     await initializeProgram({
       program,
       provider,
-      mint,
+      initParams: { mint, tokenDraftContestFeePercent },
     });
 
   return {
