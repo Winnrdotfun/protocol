@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 pub enum ConfigError {
     Unauthorized,
     AlreadyInitialized,
+    InvalidFeePercent,
 }
 
 #[error_code]

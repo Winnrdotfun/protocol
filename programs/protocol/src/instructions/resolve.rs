@@ -1,8 +1,13 @@
-use anchor_lang::prelude::*;
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
-use crate::state::contest::TokenDraftContest;
 use crate::errors::ContestError;
+use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
+use crate::state::metadata::ContestMetadata;
+use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
+use anchor_spl::token_interface::{
+    transfer_checked, TokenAccount, TokenInterface, TransferChecked,
+};
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 #[derive(Accounts)]
 pub struct ResolveTokenDraftContest<'info> {
@@ -19,18 +24,44 @@ pub struct ResolveTokenDraftContest<'info> {
     )]
     pub contest_credits: Account<'info, TokenDraftContestCredits>,
 
+    #[account(
+        mut,
+        seeds = [b"contest_metadata"],
+        bump
+    )]
+    pub contest_metadata: Account<'info, ContestMetadata>,
+
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        token::mint = mint,
+        seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
+        bump
+    )]
+    pub escrow_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        token::mint = mint,
+        seeds = [b"fee_token_account", mint.key().to_bytes().as_ref()],
+        bump
+    )]
+    pub fee_token_account: InterfaceAccount<'info, TokenAccount>,
+
     pub feed0: Option<Account<'info, PriceUpdateV2>>,
     pub feed1: Option<Account<'info, PriceUpdateV2>>,
     pub feed2: Option<Account<'info, PriceUpdateV2>>,
     pub feed3: Option<Account<'info, PriceUpdateV2>>,
     pub feed4: Option<Account<'info, PriceUpdateV2>>,
-    
+
+    pub token_program: Interface<'info, TokenInterface>,
+
     pub system_program: Program<'info, System>,
 }
 
-pub fn resolve_token_draft_contest(
-    ctx: Context<ResolveTokenDraftContest>,
-) -> Result<()> {
+pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Result<()> {
     let contest = &ctx.accounts.contest;
     let current_time = Clock::get()?.unix_timestamp as u64;
 
@@ -45,7 +76,7 @@ pub fn resolve_token_draft_contest(
         &ctx.accounts.feed2,
         &ctx.accounts.feed3,
         &ctx.accounts.feed4,
-        ];
+    ];
 
     let clock = Clock::get()?;
     let mut token_rois: Vec<f64> = Vec::new();
@@ -56,21 +87,18 @@ pub fn resolve_token_draft_contest(
         let price = get_token_roi(&clock, start_price, &feed_id, feed_account)?;
         token_rois.push(price);
     }
-
     ctx.accounts.contest.token_rois = token_rois.clone();
-    
+
     // Calculate the average ROI for each user
     let num_entries = ctx.accounts.contest.num_entries as usize;
     let num_tokens = ctx.accounts.contest.token_feed_ids.len();
     let credit_allocations = &ctx.accounts.contest_credits.credit_allocations;
     let mut user_avg_rois: Vec<(usize, f64)> = Vec::with_capacity(num_entries);
     for i in 0..num_entries {
-        let alloc = &credit_allocations[(i*num_tokens)..(i*num_tokens + num_tokens)];
-        user_avg_rois.push(
-            (i, calc_avg_roi(alloc, &token_rois))
-        )
+        let alloc = &credit_allocations[(i * num_tokens)..(i * num_tokens + num_tokens)];
+        user_avg_rois.push((i, calc_avg_roi(alloc, &token_rois)))
     }
-    
+
     // Find the top N users
     let num_top_users = ctx.accounts.contest.winner_reward_allocation.len();
     let winners = find_top_n(&user_avg_rois, num_top_users);
@@ -79,10 +107,34 @@ pub fn resolve_token_draft_contest(
     ctx.accounts.contest.winner_ids = winners.iter().map(|v| v.0 as u32).collect();
     ctx.accounts.contest.is_resolved = true;
 
+    // Transfer the fee from the escrow to the fee account
+    let fee_frac = ctx
+        .accounts
+        .contest_metadata
+        .token_draft_contest_fee_percent as f64
+        / 100.0;
+    let total_pool_amount = ctx.accounts.contest.pool_amount() as f64;
+    let fee_amount = (fee_frac * total_pool_amount).floor() as u64;
+
+    let cpi_accounts = TransferChecked {
+        mint: ctx.accounts.mint.to_account_info(),
+        from: ctx.accounts.escrow_token_account.to_account_info(),
+        to: ctx.accounts.fee_token_account.to_account_info(),
+        authority: ctx.accounts.escrow_token_account.to_account_info(),
+    };
+    let cpi_program = ctx.accounts.token_program.to_account_info();
+    let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+    transfer_checked(cpi_context, fee_amount, ctx.accounts.mint.decimals)?;
+
     Ok(())
 }
 
-fn get_token_roi(clock: &Clock, start_price: f64, _feed_id: &Pubkey, feed: &Account<'_, PriceUpdateV2>) -> Result<f64> {
+fn get_token_roi(
+    clock: &Clock,
+    start_price: f64,
+    _feed_id: &Pubkey,
+    feed: &Account<'_, PriceUpdateV2>,
+) -> Result<f64> {
     let maximum_age = 60;
     let feed_id = _feed_id.to_bytes();
     // let price_data = feed.get_price_no_older_than(clock, maximum_age, &feed_id)?;
@@ -135,19 +187,19 @@ fn sift_down(arr: &mut Vec<(usize, f64)>, mut root: usize) {
         let left = 2 * root + 1;
         let right = 2 * root + 2;
         let mut smallest = root;
-        
+
         if left < len && arr[left].1 < arr[smallest].1 {
             smallest = left;
         }
-        
+
         if right < len && arr[right].1 < arr[smallest].1 {
             smallest = right;
         }
-        
+
         if smallest == root {
             break;
         }
-        
+
         arr.swap(root, smallest);
         root = smallest;
     }
