@@ -12,7 +12,7 @@ import { expect } from "chai";
 
 const { PublicKey } = web3;
 
-describe.skip("initialize", () => {
+describe("initialize", () => {
   //   const provider = AnchorProvider.env();
   const provider = AnchorProvider.local();
   setProvider(provider);
@@ -52,8 +52,9 @@ describe.skip("initialize", () => {
       tokenProgram: utils.token.TOKEN_PROGRAM_ID,
     };
 
+    const tokenDraftContestFeePercent = 10;
     const sig = await pg.methods
-      .initialize()
+      .initialize(tokenDraftContestFeePercent)
       .accounts(accounts)
       .signers([signer])
       .rpc();
@@ -64,7 +65,6 @@ describe.skip("initialize", () => {
     expect(configAccount.admin.toBase58()).to.equal(
       signer.publicKey.toBase58()
     );
-    expect(configAccount.isInitialized).to.equal(true);
 
     const contestMetadataAccount = await pg.account.contestMetadata.fetch(
       contestMetadataPda
