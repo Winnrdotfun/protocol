@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
-pub mod state;
-pub mod instructions;
 pub mod errors;
+pub mod instructions;
+pub mod state;
 
 use instructions::*;
 
@@ -49,5 +49,9 @@ pub mod protocol {
 
     pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result<()> {
         claim::claim_token_draft_contest(ctx)
+    }
+
+    pub fn withdraw_fee(ctx: Context<WithdrawFee>) -> Result<()> {
+        withdraw_fee::withdraw_fee(ctx)
     }
 }
