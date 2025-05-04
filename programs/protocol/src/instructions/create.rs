@@ -63,8 +63,8 @@ pub fn create_token_draft_contest(
     require!(end_time > start_time, ContestError::InvalidDuration);
 
     // Reward allocation must be sorted in descending order and sum to 100
-    let is_allocation_good = reward_allocation.is_sorted_by(|a, b| a >= b)
-        && reward_allocation.iter().sum::<u8>() == 100u8;
+    let is_allocation_good = reward_allocation.windows(2).all(|v| v[0] >= v[1])
+        && reward_allocation.iter().sum::<u8>() == 100;
     require!(is_allocation_good, ContestError::InvalidRewardAllocation);
 
     // At least one token must be selected for the draft and no more than MAX_TOKEN_PER_DRAFT
