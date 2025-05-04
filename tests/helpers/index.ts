@@ -38,8 +38,12 @@ export const initializeProgram = async (args: {
     [Buffer.from("contest_metadata")],
     programId
   );
-  const [programTokenAccountPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("token_account"), mint.toBuffer()],
+  const [escrowTokenAccountPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("escrow_token_account"), mint.toBuffer()],
+    programId
+  );
+  const [feeTokenAccountPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("fee_token_account"), mint.toBuffer()],
     programId
   );
 
@@ -48,7 +52,8 @@ export const initializeProgram = async (args: {
     config: configPda,
     contestMetadata: contestMetadataPda,
     mint,
-    tokenAccount: programTokenAccountPda,
+    escrowTokenAccount: escrowTokenAccountPda,
+    feeTokenAccount: feeTokenAccountPda,
     tokenProgram: utils.token.TOKEN_PROGRAM_ID,
     systemProgram: web3.SystemProgram.programId,
   };
@@ -63,7 +68,8 @@ export const initializeProgram = async (args: {
     txSignature,
     configPda,
     contestMetadataPda,
-    programTokenAccountPda,
+    escrowTokenAccountPda,
+    feeTokenAccountPda,
   };
 };
 

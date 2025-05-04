@@ -27,7 +27,8 @@ describe.skip("enter", () => {
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
   let contestPda: web3.PublicKey;
-  let programTokenAccountPda: web3.PublicKey;
+  let escrowTokenAccountPda: web3.PublicKey;
+  let feeTokenAccountPda: web3.PublicKey;
   let signers: web3.Keypair[];
   let signerTokenAccounts: Account[];
   let pythSolanaReceiver: PythSolanaReceiver;
@@ -56,7 +57,8 @@ describe.skip("enter", () => {
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
     contestPda = res.contestPda;
-    programTokenAccountPda = res.programTokenAccountPda;
+    escrowTokenAccountPda = res.escrowTokenAccountPda;
+    feeTokenAccountPda = res.feeTokenAccountPda;
     pythSolanaReceiver = res.pythSolanaReceiver;
     signerTokenAccounts = res.signerTokenAccounts;
   });
@@ -85,7 +87,8 @@ describe.skip("enter", () => {
       contestEntry: contestEntryPda,
       contestCredits: contestCreditsPda,
       mint,
-      programTokenAccount: programTokenAccountPda,
+      escrowTokenAccount: escrowTokenAccountPda,
+      feeTokenAccount: feeTokenAccountPda,
       signerTokenAccount: signerTokenAccount.address,
       tokenProgram: utils.token.TOKEN_PROGRAM_ID,
     };
@@ -102,7 +105,7 @@ describe.skip("enter", () => {
 
     const programTokenAccount = await getAccount(
       connection,
-      programTokenAccountPda
+      escrowTokenAccountPda
     );
 
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);

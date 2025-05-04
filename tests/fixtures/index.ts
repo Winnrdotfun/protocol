@@ -72,12 +72,17 @@ export const fixtureBase = async (args: {
   );
 
   // Initialize the program
-  const { txSignature, configPda, contestMetadataPda, programTokenAccountPda } =
-    await initializeProgram({
-      program,
-      provider,
-      initParams: { mint, tokenDraftContestFeePercent },
-    });
+  const {
+    txSignature,
+    configPda,
+    contestMetadataPda,
+    escrowTokenAccountPda,
+    feeTokenAccountPda,
+  } = await initializeProgram({
+    program,
+    provider,
+    initParams: { mint, tokenDraftContestFeePercent },
+  });
 
   return {
     signers,
@@ -88,7 +93,8 @@ export const fixtureBase = async (args: {
     initializeTxSignature: txSignature,
     configPda,
     contestMetadataPda,
-    programTokenAccountPda,
+    escrowTokenAccountPda,
+    feeTokenAccountPda,
   };
 };
 
