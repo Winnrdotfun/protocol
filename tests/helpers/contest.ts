@@ -46,7 +46,7 @@ export const createContest = async (args: {
     ],
     programId
   );
-  const [creditsPda] = PublicKey.findProgramAddressSync(
+  const [contestCreditsPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("token_draft_contest_credits"), contestPda.toBuffer()],
     programId
   );
@@ -68,7 +68,7 @@ export const createContest = async (args: {
     signer: signer.publicKey,
     contestMetadata: contestMetadataPda,
     contest: contestPda,
-    credits: creditsPda,
+    contestCredits: contestCreditsPda,
     feed0: feedAccounts[0],
     feed1: feedAccounts[1] || null,
     feed2: feedAccounts[2] || null,
@@ -89,7 +89,7 @@ export const createContest = async (args: {
     .signers([signer])
     .rpc();
 
-  return { txSignature, contestPda };
+  return { txSignature, contestPda, contestCreditsPda };
 };
 
 export const enterContest = async (args: {
@@ -98,7 +98,8 @@ export const enterContest = async (args: {
   configPda: web3.PublicKey;
   contestPda: web3.PublicKey;
   mint: web3.PublicKey;
-  programTokenAccountPda: web3.PublicKey;
+  escrowTokenAccountPda: web3.PublicKey;
+  feeTokenAccountPda: web3.PublicKey;
   signerTokenAccount: Account;
   creditAllocation: number[];
 }) => {
@@ -108,7 +109,8 @@ export const enterContest = async (args: {
     signer,
     configPda,
     mint,
-    programTokenAccountPda,
+    escrowTokenAccountPda,
+    feeTokenAccountPda,
     signerTokenAccount,
     creditAllocation,
   } = args;
@@ -133,7 +135,8 @@ export const enterContest = async (args: {
     contestEntry: contestEntryPda,
     contestCredits: contestCreditsPda,
     mint,
-    programTokenAccount: programTokenAccountPda,
+    escrowTokenAccount: escrowTokenAccountPda,
+    feeTokenAccount: feeTokenAccountPda,
     signerTokenAccount: signerTokenAccount.address,
     tokenProgram: utils.token.TOKEN_PROGRAM_ID,
   };
@@ -153,17 +156,31 @@ export const resolveContest = async (args: {
   signer: web3.Keypair;
   hermesClient: HermesClient;
   pythSolanaReceiver: PythSolanaReceiver;
+  mint: web3.PublicKey;
   contestPda: web3.PublicKey;
+  contestMetadataPda: web3.PublicKey;
+  contestCreditsPda: web3.PublicKey;
+  escrowTokenAccountPda: web3.PublicKey;
+  feeTokenAccountPda: web3.PublicKey;
 }) => {
-  const { program, signer, contestPda, hermesClient, pythSolanaReceiver } =
-    args;
+  const {
+    program,
+    signer,
+    mint,
+    contestPda,
+    contestMetadataPda,
+    contestCreditsPda,
+    hermesClient,
+    pythSolanaReceiver,
+    escrowTokenAccountPda,
+    feeTokenAccountPda,
+  } = args;
   const contest = await program.account.tokenDraftContest.fetch(contestPda);
 
   const priceFeedIds = contest.tokenFeedIds.map(
     (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
   );
 
-  // const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
   const endTimestamp = Math.floor(Date.now() / 1000) - 60 * 60 * 24; // 1 day ago
   // const endTimestamp = contest.endTime.toNumber();
   const priceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
@@ -182,17 +199,25 @@ export const resolveContest = async (args: {
         getPriceUpdateAccount(id)
       );
 
+      const accounts = {
+        signer: signer.publicKey,
+        contest: contestPda,
+        contestCredits: contestCreditsPda,
+        contestMetadata: contestMetadataPda,
+        mint,
+        escrowTokenAccount: escrowTokenAccountPda,
+        feeTokenAccount: feeTokenAccountPda,
+        feed0: priceUpdateAccounts[0],
+        feed1: priceUpdateAccounts[1] || null,
+        feed2: priceUpdateAccounts[2] || null,
+        feed3: priceUpdateAccounts[3] || null,
+        feed4: priceUpdateAccounts[4] || null,
+        tokenProgram: utils.token.TOKEN_PROGRAM_ID,
+      };
+
       const txInstruction = await program.methods
         .resolveTokenDraftContest()
-        .accounts({
-          signer: signer.publicKey,
-          contest: contestPda,
-          feed0: priceUpdateAccounts[0],
-          feed1: priceUpdateAccounts[1] || null,
-          feed2: priceUpdateAccounts[2] || null,
-          feed3: priceUpdateAccounts[3] || null,
-          feed4: priceUpdateAccounts[4] || null,
-        })
+        .accounts(accounts)
         .instruction();
 
       const instruction: InstructionWithEphemeralSigners = {
