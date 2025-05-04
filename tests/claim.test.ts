@@ -18,7 +18,7 @@ import {
 } from "./helpers";
 import { fixtureWithContest } from "./fixtures";
 
-describe.skip("claim", () => {
+describe("claim", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;

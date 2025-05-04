@@ -10,13 +10,14 @@ import {
   InstructionWithEphemeralSigners,
   PythSolanaReceiver,
 } from "@pythnetwork/pyth-solana-receiver";
-import { Account } from "@solana/spl-token";
+import { Account, getAccount } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { Protocol } from "../target/types/protocol";
 import { enterContest, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
 import { fixtureWithContest } from "./fixtures";
+import { expect } from "chai";
 
-describe.skip("resolve", () => {
+describe("resolve", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;
@@ -34,6 +35,8 @@ describe.skip("resolve", () => {
   let pythSolanaReceiver: PythSolanaReceiver;
   let priceServiceConnection: HermesClient;
   const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
+  let numEntries;
+  let numWinners;
 
   before(async () => {
     const currentTime = Math.floor(Date.now() / 1000);
@@ -47,6 +50,8 @@ describe.skip("resolve", () => {
       priceFeedIds,
       rewardAllocation: [75, 25],
     };
+
+    numWinners = contestParams.rewardAllocation.length;
 
     const res = await fixtureWithContest({
       provider,
@@ -71,6 +76,7 @@ describe.skip("resolve", () => {
       [40, 60],
       [75, 25],
     ];
+    numEntries = creditAllocations.length;
 
     for (let i = 0; i < creditAllocations.length; i++) {
       const { txSignature } = await enterContest({
@@ -134,7 +140,7 @@ describe.skip("resolve", () => {
 
         const instruction: InstructionWithEphemeralSigners = {
           instruction: txInstruction,
-          signers: [signer],
+          signers: [],
         };
 
         return [instruction];
@@ -148,20 +154,31 @@ describe.skip("resolve", () => {
     const sigs = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
       skipPreflight: false,
     });
+
     console.log("signatures:", sigs);
 
-    // const tx = await connection.getTransaction(sigs[2], {
-    //   commitment: "confirmed",
-    //   maxSupportedTransactionVersion: 0,
-    // });
-    // console.log("tx:", tx);
-    // console.log("logs:", tx?.meta?.logMessages);
-
-    // const contest = await pg.account.tokenDraftContest.fetch(contestPda);
+    const contest = await pg.account.tokenDraftContest.fetch(contestPda);
     // console.log("contest:", contest);
-    // const contestEntry = await pg.account.tokenDraftContestEntry.fetch(
-    //   contestEntryPda
-    // );
-    // expect(contest.isResolved).equal(true);
+    expect(contest.isResolved).equal(true);
+    expect(contest.numEntries).equal(numEntries);
+    expect(contest.winnerIds.length).equal(numWinners);
+
+    const contestMetadata = await pg.account.contestMetadata.fetch(
+      contestMetadataPda
+    );
+    const escrowTokenAccount = await getAccount(
+      provider.connection,
+      escrowTokenAccountPda
+    );
+    const feeTokenAccount = await getAccount(
+      provider.connection,
+      feeTokenAccountPda
+    );
+    const feePercent = contestMetadata.tokenDraftContestFeePercent;
+    const feeAmount = feeTokenAccount.amount;
+
+    console.log("escrowTokenAccount:", escrowTokenAccount.amount.toString());
+    console.log("feeTokenAccount:", feeTokenAccount.amount.toString());
+    console.log("feePercent:", feePercent.toString());
   });
 });
