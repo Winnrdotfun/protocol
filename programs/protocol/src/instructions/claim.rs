@@ -96,7 +96,7 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     let total_pool_amount = contest.pool_amount();
     let fee_amount = (fee_frac * total_pool_amount as f64).floor() as u64;
     let total_reward_amount = total_pool_amount - fee_amount;
-    let user_reward_amount = (alloc as u64 / 100) * total_reward_amount;
+    let user_reward_amount = ((alloc as f64 / 100.0) * (total_reward_amount as f64)).floor() as u64;
 
     // Transfer the reward to the user's token account
     let cpi_accounts = TransferChecked {
