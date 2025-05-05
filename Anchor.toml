@@ -4,64 +4,66 @@
 resolution = true
 skip-lint = false
 
+
 [programs.localnet]
-protocol = "E35TzkfrR1LoNEevvRFK9frvrFQgSGxN251rvpVrzW2"
+protocol = "GYwkcJJiUrDnXKYiqMqxfA93h9MejpJbrBHJ73gnfr15"
+
+[programs.devnet]
+protocol = "GYwkcJJiUrDnXKYiqMqxfA93h9MejpJbrBHJ73gnfr15"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "http://localhost:8899"
-# cluster = "https://devnet.helius-rpc.com/?api-key=074f9832-beac-403b-a698-4c3ed9045065"
-# cluster = "https://mainnet.helius-rpc.com/?api-key=074f9832-beac-403b-a698-4c3ed9045065"
 # cluster = "Localnet"
+# cluster = "http://localhost:8899"
+# cluster = "https://api.mainnet-beta.solana.com"
+cluster = "https://api.devnet.solana.com"
+
 wallet = "~/.config/solana/id.json"
 
 [scripts]
+deploy-init = "anchor deploy && yarn run ts-node scripts/initialize.ts"
+init = "yarn run ts-node scripts/initialize.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
 
 [test]
 startup_wait = 10000
+shutdown_wait = 2000
+upgradeable = false
 
-# Pyth solana receiver program
 [[test.genesis]]
 address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
 program = "program_dumps/pyth-solana-receiver.so"
 
-# Pyth solana price feed program
 [[test.genesis]]
 address = "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT"
 program = "program_dumps/pyth-price-feed.so"
 
-# Wormhole program
 [[test.genesis]]
 address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
 program = "program_dumps/wormhole.so"
 
 [test.validator]
+bind_address = "0.0.0.0"
 url = "https://api.mainnet-beta.solana.com"
- 
-# BONK feed account
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
+
 [[test.validator.clone]]
 address = "DBE3N8uNjhKPRHfANdwGvCZghWXyLPdqdSbEW2XFwBiX"
 
-# POPCAT feed account
 [[test.validator.clone]]
 address = "6UxPR2nXJNNM1nESVWGAf8NXMVu3SGgYf3ZfUFoGB9cs"
 
-# WIF feed account
 [[test.validator.clone]]
 address = "6B23K3tkb51vLZA14jcEQVCA1pfHptzEHFA93V5dYwbT"
 
-# TRUMP feed account
 [[test.validator.clone]]
 address = "9vNb2tQoZ8bB4vzMbQLWViGwNaDJVtct13AGgno1wazp"
 
-# Wormhole guardian set account
 [[test.validator.clone]]
 address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn"
 
-# Configuration account
 [[test.validator.clone]]
 address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
-

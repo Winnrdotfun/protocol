@@ -9,7 +9,7 @@ elif [[ "$1" == "devnet" ]]; then
 elif [[ "$1" == "mainnet" ]]; then
   RPC=$RPC_MAINNET
 else
-  echo "Usage: $0 {local|devnet|testnet|mainnet}"
+  echo "Usage: $0 {local|devnet|mainnet}"
   exit 1
 fi
 
@@ -17,6 +17,7 @@ echo "Starting Solana test validator with RPC URL: $RPC"
 
 solana-test-validator \
   --reset \
+  --deactivate-feature EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33 \
   --url $RPC \
   --clone-upgradeable-program rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ \
   --clone-upgradeable-program pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT \
