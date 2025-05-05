@@ -1,63 +1,22 @@
-import fs from "fs";
-import os from "os";
-import path from "path";
+import { web3 } from "@coral-xyz/anchor";
 import {
-  AnchorProvider,
-  Program,
-  setProvider,
-  utils,
-  Wallet,
-  web3,
-  workspace,
-} from "@coral-xyz/anchor";
-import type { Protocol as IWinnr } from "../target/types/protocol";
-import {
+  chainConfig,
   configPda,
+  connection,
   contestMetadataPda,
+  env,
   escrowTokenAccountPda,
   feeTokenAccountPda,
   mint,
   program,
   wallet,
 } from "./config";
-
-const { PublicKey } = web3;
-
-const mintAddress = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 const tokenDraftContestFeePercent = 10;
-const cluster = "http://127.0.0.1:8899";
-const walletPath = ".config/solana/id.json";
 
 export const main = async () => {
-  // console.log("Initializing program...");
-  // const connection = new web3.Connection(cluster, "confirmed");
-  // const walletKeypair = loadWalletKey(path.join(os.homedir(), walletPath));
-  // const wallet = new Wallet(walletKeypair);
-  // const provider = new AnchorProvider(connection, wallet);
-  // setProvider(provider);
-  // const pg = workspace.Protocol as Program<IWinnr>;
-  // const programId = pg.programId;
-  // const signer = wallet.payer;
-
-  // const mint = new PublicKey(mintAddress);
-
-  // const [configPda] = PublicKey.findProgramAddressSync(
-  //   [Buffer.from("config")],
-  //   programId
-  // );
-  // const [contestMetadataPda] = PublicKey.findProgramAddressSync(
-  //   [Buffer.from("contest_metadata")],
-  //   programId
-  // );
-  // const [escrowTokenAccountPda] = PublicKey.findProgramAddressSync(
-  //   [Buffer.from("escrow_token_account"), mint.toBuffer()],
-  //   programId
-  // );
-  // const [feeTokenAccountPda] = PublicKey.findProgramAddressSync(
-  //   [Buffer.from("fee_token_account"), mint.toBuffer()],
-  //   programId
-  // );
+  console.log(`Executing script on: ${env} (${chainConfig.rpc})`);
 
   const signer = wallet.payer;
 
@@ -68,28 +27,29 @@ export const main = async () => {
     mint,
     escrowTokenAccount: escrowTokenAccountPda,
     feeTokenAccount: feeTokenAccountPda,
-    tokenProgram: utils.token.TOKEN_PROGRAM_ID,
+    tokenProgram: TOKEN_PROGRAM_ID,
     systemProgram: web3.SystemProgram.programId,
   };
 
-  const txSignature = await program.methods
+  const tx = await program.methods
     .initialize(tokenDraftContestFeePercent)
     .accounts(accounts)
-    .signers([signer])
-    .rpc();
-  console.log("Initialization tx signature:", txSignature);
+    .transaction();
 
-  // return {
-  //   txSignature,
-  //   configPda,
-  //   contestMetadataPda,
-  //   escrowTokenAccountPda,
-  //   feeTokenAccountPda,
-  // };
+  tx.recentBlockhash = await connection
+    .getLatestBlockhash()
+    .then((r) => r.blockhash);
+  tx.feePayer = wallet.publicKey;
+
+  const signedTx = await wallet.signTransaction(tx);
+  const sig = await connection.sendRawTransaction(signedTx.serialize(), {
+    skipPreflight: true,
+  });
+  console.log("Initialization tx signature:", sig);
 };
 
 main()
-  .then((result) => {
+  .then((res) => {
     console.log("Initialization successful!");
   })
   .catch((error) => {
