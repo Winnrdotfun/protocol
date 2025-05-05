@@ -7,22 +7,31 @@ import {
   web3,
   workspace,
 } from "@coral-xyz/anchor";
+import dotenv from "dotenv";
 import type { Protocol as IWinnr } from "../../target/types/protocol";
 import { loadWalletKey } from "../utils";
-import dotenv from "dotenv";
-
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import { HermesClient } from "@pythnetwork/hermes-client";
 dotenv.config();
 
-export const env = "localnet";
+const args = process.argv as string[];
+export const envs = ["localnet", "devnet", "mainnet"];
 
-export const rpcLocal = process.env.RPC_LOCAL as string;
+export const env = args[2] ? args[2] : "localnet";
+if (!envs.includes(env)) {
+  throw new Error(
+    `Invalid environment. Please use one of the following: ${envs.join(", ")}`
+  );
+}
+
+export const rpcLocalnet = process.env.RPC_LOCALNET as string;
 export const rpcDevnet = process.env.RPC_DEVNET as string;
 export const rpcMainnet = process.env.RPC_MAINNET as string;
 export const walletPath = process.env.WALLET_PATH as string;
 
 export const chainConfigs = {
   localnet: {
-    rpc: rpcLocal,
+    rpc: rpcLocalnet,
     // Using mainnet clone
     usdcAddress: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   },
@@ -36,13 +45,20 @@ export const chainConfigs = {
   },
 };
 
-// export const cluster = chainConfig[env].rpc;
 export const chainConfig = chainConfigs[env];
 export const connection = new web3.Connection(chainConfig.rpc, "confirmed");
-// export const walletKeypair = loadWalletKey(walletPath);
 export const walletKeypair = loadWalletKey(path.join(os.homedir(), walletPath));
 export const wallet = new Wallet(walletKeypair);
 export const provider = new AnchorProvider(connection, wallet);
 export const program = workspace.Protocol as Program<IWinnr>;
+
+export const pythSolanaReceiver = new PythSolanaReceiver({
+  connection,
+  wallet: wallet as any,
+});
+export const priceServiceConnection = new HermesClient(
+  "https://hermes.pyth.network/",
+  {}
+);
 
 export * from "./constants";
