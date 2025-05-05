@@ -13,7 +13,7 @@ export const createMint = async (args: {
     args.owner,
     args.owner.publicKey,
     args.owner.publicKey,
-    9
+    USDC_DECIMALS
   );
 
   return mint;
