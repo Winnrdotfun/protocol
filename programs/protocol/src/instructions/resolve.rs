@@ -66,7 +66,10 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
     let current_time = Clock::get()?.unix_timestamp as u64;
 
     // Check that end time has passed
-    // require!(current_time > contest.end_time, ContestError::ContestNotEnded);
+    require!(
+        current_time > contest.end_time,
+        ContestError::ContestNotEnded
+    );
 
     require!(!contest.is_resolved, ContestError::AlreadyResolved);
 
