@@ -4,6 +4,15 @@ import { Protocol as IWinnr } from "../../target/types/protocol";
 
 const { PublicKey } = web3;
 
+export type ContestParams = {
+  startTime: number;
+  endTime: number;
+  entryFee: bigint;
+  maxEntries: number;
+  priceFeedIds: string[];
+  rewardAllocation: number[];
+};
+
 export const createMint = async (args: {
   connection: web3.Connection;
   owner: web3.Keypair;
@@ -78,6 +87,8 @@ export const hexToBase58 = (hex: string) => {
   const buffer = Buffer.from(x, "hex");
   return utils.bytes.bs58.encode(buffer);
 };
+
+export const now = () => Math.floor(Date.now() / 1000);
 
 export const USDC_DECIMALS = 6;
 export const UNITS_PER_USDC = 10 ** USDC_DECIMALS;
