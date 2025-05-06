@@ -13,7 +13,7 @@ else
   exit 1
 fi
 
-echo "Starting Solana test validator with RPC URL: $RPC"
+echo "Starting Solana test validator with RPC URL ($1): $RPC"
 
 solana-test-validator \
   --reset \
