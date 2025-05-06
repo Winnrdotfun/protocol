@@ -71,7 +71,6 @@ pub fn enter_token_draft_contest(
     credit_allocation: Vec<u8>,
 ) -> Result<()> {
     let contest = &mut ctx.accounts.contest;
-    // let current_time = Clock::get()?.unix_timestamp as u64;
 
     // Check if the contest entry is closed
     require!(contest.is_entry_active(), ContestError::EntryClosed);
