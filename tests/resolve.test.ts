@@ -4,6 +4,7 @@ import {
   web3,
   workspace,
   utils,
+  BN,
 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
@@ -13,11 +14,16 @@ import {
 import { Account, getAccount } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { Protocol } from "../target/types/protocol";
-import { enterContest, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
+import {
+  ContestParams,
+  enterContest,
+  pythPriceFeedIds,
+  UNITS_PER_USDC,
+} from "./helpers";
 import { fixtureWithContest } from "./fixtures";
 import { expect } from "chai";
 
-describe("resolve", () => {
+describe.only("resolve", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;
@@ -35,14 +41,16 @@ describe("resolve", () => {
   let pythSolanaReceiver: PythSolanaReceiver;
   let priceServiceConnection: HermesClient;
   const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
-  let numEntries;
-  let numWinners;
+  let numTokens: number = priceFeedIds.length;
+  let numEntries: number;
+  let numWinners: number;
+  let contestParams: ContestParams;
 
   before(async () => {
     const currentTime = Math.floor(Date.now() / 1000);
     const startTime = currentTime + 60 * 60; // 1 hour from now
     const endTime = startTime + 60 * 60 * 24; // 1 day from now
-    const contestParams = {
+    contestParams = {
       startTime,
       endTime,
       entryFee: BigInt(10 * UNITS_PER_USDC),
@@ -146,10 +154,22 @@ describe("resolve", () => {
         return [instruction];
       }
     );
-
     const versionedTxs = await txBuilder.buildVersionedTransactions({
       computeUnitPriceMicroLamports: 50000,
     });
+
+    const escrowTokenAccountBefore = await getAccount(
+      provider.connection,
+      escrowTokenAccountPda
+    );
+    const feeTokenAccountBefore = await getAccount(
+      provider.connection,
+      feeTokenAccountPda
+    );
+    expect(escrowTokenAccountBefore.amount.toString()).equal(
+      (contestParams.entryFee * BigInt(numEntries)).toString()
+    );
+    expect(feeTokenAccountBefore.amount.toString()).equal("0");
 
     const sigs = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
       skipPreflight: false,
@@ -158,15 +178,11 @@ describe("resolve", () => {
     console.log("signatures:", sigs);
 
     const contest = await pg.account.tokenDraftContest.fetch(contestPda);
-    // console.log("contest:", contest);
-    expect(contest.isResolved).equal(true);
-    expect(contest.numEntries).equal(numEntries);
-    expect(contest.winnerIds.length).equal(numWinners);
-
     const contestMetadata = await pg.account.contestMetadata.fetch(
       contestMetadataPda
     );
-    const escrowTokenAccount = await getAccount(
+
+    const escrowTokenAccountAfter = await getAccount(
       provider.connection,
       escrowTokenAccountPda
     );
@@ -174,11 +190,18 @@ describe("resolve", () => {
       provider.connection,
       feeTokenAccountPda
     );
-    const feePercent = contestMetadata.tokenDraftContestFeePercent;
-    const feeAmount = feeTokenAccount.amount;
 
-    console.log("escrowTokenAccount:", escrowTokenAccount.amount.toString());
-    console.log("feeTokenAccount:", feeTokenAccount.amount.toString());
-    console.log("feePercent:", feePercent.toString());
+    const totalPoolAmount = contest.entryFee.mul(new BN(contest.numEntries));
+    const feePercent = contestMetadata.tokenDraftContestFeePercent;
+    const feeAmount = totalPoolAmount.mul(new BN(feePercent)).div(new BN(100));
+
+    expect(contest.isResolved).equal(true);
+    expect(contest.numEntries).equal(numEntries);
+    expect(contest.winnerIds.length).equal(numWinners);
+    expect(contest.tokenRois.length).equal(numTokens);
+    expect(feeAmount.toString()).equal(feeTokenAccount.amount.toString());
+    expect(escrowTokenAccountAfter.amount.toString()).equal(
+      totalPoolAmount.sub(feeAmount).toString()
+    );
   });
 });
