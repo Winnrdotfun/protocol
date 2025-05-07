@@ -11,7 +11,7 @@ import { Program } from "@coral-xyz/anchor";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { Account, getAccount } from "@solana/spl-token";
 import { Protocol } from "../target/types/protocol";
-import { pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
+import { ContestParams, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
 import { fixtureWithContest } from "./fixtures";
 
 const { PublicKey } = web3;
@@ -32,7 +32,7 @@ describe("enter", () => {
   let signers: web3.Keypair[];
   let signerTokenAccounts: Account[];
   let pythSolanaReceiver: PythSolanaReceiver;
-  let contestParams;
+  let contestParams: ContestParams;
 
   before(async () => {
     const currentTime = Math.floor(Date.now() / 1000);
@@ -112,7 +112,6 @@ describe("enter", () => {
     const contestEntry = await pg.account.tokenDraftContestEntry.fetch(
       contestEntryPda
     );
-
     expect(contest.numEntries).equal(1);
     expect(contestEntry.id).equal(0);
     expect(contestEntry.user.toBase58()).equal(signer.publicKey.toBase58());

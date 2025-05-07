@@ -1,8 +1,7 @@
 use crate::state::config::Config;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use anchor_spl::token_interface::{
-    transfer_checked, TokenAccount, TokenInterface, TransferChecked,
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
 #[derive(Accounts)]
@@ -17,20 +16,20 @@ pub struct WithdrawFee<'info> {
         seeds = [b"config"],
         bump,
     )]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
         seeds = [b"fee_token_account", config.mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub fee_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(mut)]
-    pub withdrawal_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub withdrawal_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(mut)]
-    pub mint: Account<'info, Mint>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 

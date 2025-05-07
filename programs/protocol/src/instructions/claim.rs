@@ -4,9 +4,8 @@ use crate::state::contest::TokenDraftContest;
 use crate::state::entry::TokenDraftContestEntry;
 use crate::state::metadata::ContestMetadata;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use anchor_spl::token_interface::{
-    transfer_checked, TokenAccount, TokenInterface, TransferChecked,
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
 #[derive(Accounts)]
@@ -18,27 +17,27 @@ pub struct ClaimTokenDraftContest<'info> {
         seeds = [b"config"],
         bump
     )]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(mut)]
-    pub contest: Account<'info, TokenDraftContest>,
+    pub contest: Box<Account<'info, TokenDraftContest>>,
 
     #[account(
         mut,
         seeds = [b"contest_metadata"],
         bump
     )]
-    pub contest_metadata: Account<'info, ContestMetadata>,
+    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
 
     #[account(
         mut,
         seeds = [b"token_draft_contest_entry", contest.key().as_ref(), signer.key().as_ref()],
         bump
     )]
-    pub contest_entry: Account<'info, TokenDraftContestEntry>,
+    pub contest_entry: Box<Account<'info, TokenDraftContestEntry>>,
 
     #[account(mut)]
-    pub mint: Account<'info, Mint>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         mut,
@@ -46,7 +45,7 @@ pub struct ClaimTokenDraftContest<'info> {
         seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
@@ -54,14 +53,14 @@ pub struct ClaimTokenDraftContest<'info> {
         seeds = [b"fee_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub fee_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         token::mint = mint,
         token::authority = signer,
     )]
-    pub signer_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub signer_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 
@@ -91,6 +90,7 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     let fee_frac = ctx
         .accounts
         .contest_metadata
+        // .load()?
         .token_draft_contest_fee_percent as f64
         / 100.0;
     let total_pool_amount = contest.pool_amount();

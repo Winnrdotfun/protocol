@@ -6,14 +6,21 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("GYwkcJJiUrDnXKYiqMqxfA93h9MejpJbrBHJ73gnfr15");
+declare_id!("F21uWStbRzTLcPTk6fsmq7wX5Cj8R72jk6rc5FXPCXmk");
 
 #[program]
 pub mod protocol {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, token_draft_contest_fee_percent: u8) -> Result<()> {
-        initialize::initialize(ctx, token_draft_contest_fee_percent)
+    pub fn init_config(
+        ctx: Context<InitConfigs>,
+        token_draft_contest_fee_percent: u8,
+    ) -> Result<()> {
+        initialize::init_config(ctx, token_draft_contest_fee_percent)
+    }
+
+    pub fn init_token_accounts(ctx: Context<InitTokenAccounts>) -> Result<()> {
+        initialize::init_token_accounts(ctx)
     }
 
     pub fn create_token_draft_contest(

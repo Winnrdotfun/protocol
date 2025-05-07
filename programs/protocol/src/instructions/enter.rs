@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use anchor_spl::token_interface::{
-    transfer_checked, TokenAccount, TokenInterface, TransferChecked,
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
 use crate::errors::ContestError;
@@ -19,10 +18,10 @@ pub struct EnterTokenDraftContest<'info> {
         seeds = [b"config"],
         bump
     )]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(mut)]
-    pub contest: Account<'info, TokenDraftContest>,
+    pub contest: Box<Account<'info, TokenDraftContest>>,
 
     #[account(
         init,
@@ -31,7 +30,7 @@ pub struct EnterTokenDraftContest<'info> {
         seeds = [b"token_draft_contest_entry", contest.key().as_ref(), signer.key().as_ref()],
         bump,
     )]
-    pub contest_entry: Account<'info, TokenDraftContestEntry>,
+    pub contest_entry: Box<Account<'info, TokenDraftContestEntry>>,
 
     #[account(
         mut,
@@ -41,10 +40,10 @@ pub struct EnterTokenDraftContest<'info> {
         seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
         bump
     )]
-    pub contest_credits: Account<'info, TokenDraftContestCredits>,
+    pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,
 
     #[account(mut)]
-    pub mint: Account<'info, Mint>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         mut,
@@ -52,14 +51,14 @@ pub struct EnterTokenDraftContest<'info> {
         seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         token::mint = mint,
         token::authority = signer,
     )]
-    pub signer_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub signer_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 

@@ -15,7 +15,7 @@ pub struct CreateTokenDraftContest<'info> {
         seeds = [b"contest_metadata"],
         bump
     )]
-    pub contest_metadata: Account<'info, ContestMetadata>,
+    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
 
     #[account(
         init,
@@ -24,7 +24,7 @@ pub struct CreateTokenDraftContest<'info> {
         seeds = [b"token_draft_contest", contest_metadata.token_draft_contest_count.to_le_bytes().as_ref(), signer.key().as_ref()],
         bump
     )]
-    pub contest: Account<'info, TokenDraftContest>,
+    pub contest: Box<Account<'info, TokenDraftContest>>,
 
     #[account(
         init,
@@ -33,13 +33,13 @@ pub struct CreateTokenDraftContest<'info> {
         seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
         bump
     )]
-    pub contest_credits: Account<'info, TokenDraftContestCredits>,
+    pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,
 
-    pub feed0: Option<Account<'info, PriceUpdateV2>>,
-    pub feed1: Option<Account<'info, PriceUpdateV2>>,
-    pub feed2: Option<Account<'info, PriceUpdateV2>>,
-    pub feed3: Option<Account<'info, PriceUpdateV2>>,
-    pub feed4: Option<Account<'info, PriceUpdateV2>>,
+    pub feed0: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed1: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed2: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed3: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed4: Option<Box<Account<'info, PriceUpdateV2>>>,
 
     pub system_program: Program<'info, System>,
 }
@@ -74,7 +74,7 @@ pub fn create_token_draft_contest(
     );
 
     // Set start prices for each token
-    let feed_accounts: Vec<&Option<Account<'_, PriceUpdateV2>>> = vec![
+    let feed_accounts: Vec<&Option<Box<Account<'_, PriceUpdateV2>>>> = vec![
         &ctx.accounts.feed0,
         &ctx.accounts.feed1,
         &ctx.accounts.feed2,
@@ -91,7 +91,11 @@ pub fn create_token_draft_contest(
     }
 
     // Set contest parameters
-    contest.id = ctx.accounts.contest_metadata.token_draft_contest_count;
+    contest.id = ctx
+        .accounts
+        .contest_metadata
+        // .load()?
+        .token_draft_contest_count;
     contest.creator = ctx.accounts.signer.key();
     contest.start_time = start_time;
     contest.end_time = end_time;
@@ -108,6 +112,9 @@ pub fn create_token_draft_contest(
     ctx.accounts.contest.winner_ids = Vec::new();
     ctx.accounts.contest.winner_reward_allocation = reward_allocation;
 
+    // Update contest metadata
+    ctx.accounts.contest_metadata.token_draft_contest_count += 1;
+
     Ok(())
 }
 
@@ -118,8 +125,8 @@ fn get_token_price(
 ) -> Result<f64> {
     let maximum_age = 60;
     let feed_id = _feed_id.to_bytes();
-    // let price_data = feed.get_price_no_older_than(clock, maximum_age, &feed_id)?;
-    let price_data = feed.get_price_unchecked(&feed_id)?;
+    let price_data = feed.get_price_no_older_than(clock, maximum_age, &feed_id)?;
+    // let price_data = feed.get_price_unchecked(&feed_id)?;
     let exp = (-price_data.exponent) as u32;
     let price = (price_data.price as u64 as f64) / (10u64.pow(exp) as f64);
     Ok(price)

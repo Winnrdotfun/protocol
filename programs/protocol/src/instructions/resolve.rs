@@ -3,9 +3,8 @@ use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use anchor_spl::token_interface::{
-    transfer_checked, TokenAccount, TokenInterface, TransferChecked,
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
@@ -15,24 +14,24 @@ pub struct ResolveTokenDraftContest<'info> {
     pub signer: Signer<'info>,
 
     #[account(mut)]
-    pub contest: Account<'info, TokenDraftContest>,
+    pub contest: Box<Account<'info, TokenDraftContest>>,
 
     #[account(
         mut,
         seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
         bump
     )]
-    pub contest_credits: Account<'info, TokenDraftContestCredits>,
+    pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,
 
     #[account(
         mut,
         seeds = [b"contest_metadata"],
         bump
     )]
-    pub contest_metadata: Account<'info, ContestMetadata>,
+    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
 
     #[account(mut)]
-    pub mint: Account<'info, Mint>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         mut,
@@ -40,7 +39,7 @@ pub struct ResolveTokenDraftContest<'info> {
         seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
@@ -48,13 +47,13 @@ pub struct ResolveTokenDraftContest<'info> {
         seeds = [b"fee_token_account", mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub fee_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    pub feed0: Option<Account<'info, PriceUpdateV2>>,
-    pub feed1: Option<Account<'info, PriceUpdateV2>>,
-    pub feed2: Option<Account<'info, PriceUpdateV2>>,
-    pub feed3: Option<Account<'info, PriceUpdateV2>>,
-    pub feed4: Option<Account<'info, PriceUpdateV2>>,
+    pub feed0: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed1: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed2: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed3: Option<Box<Account<'info, PriceUpdateV2>>>,
+    pub feed4: Option<Box<Account<'info, PriceUpdateV2>>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 
@@ -73,7 +72,7 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
 
     require!(!contest.is_resolved, ContestError::AlreadyResolved);
 
-    let feed_accounts: Vec<&Option<Account<'_, PriceUpdateV2>>> = vec![
+    let feed_accounts: Vec<&Option<Box<Account<'_, PriceUpdateV2>>>> = vec![
         &ctx.accounts.feed0,
         &ctx.accounts.feed1,
         &ctx.accounts.feed2,
