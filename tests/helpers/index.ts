@@ -35,6 +35,7 @@ export const initializeProgram = async (args: {
 }) => {
   const { provider, program: pg, initParams } = args;
   const { mint, tokenDraftContestFeePercent } = initParams;
+  const connection = provider.connection;
 
   const signer = provider.wallet.payer;
   const programId = pg.programId;
@@ -56,25 +57,49 @@ export const initializeProgram = async (args: {
     programId
   );
 
-  const accounts = {
+  const initConfigAccounts = {
     signer: signer.publicKey,
     config: configPda,
     contestMetadata: contestMetadataPda,
     mint,
+  };
+
+  const initTokenAccountsAccounts = {
+    signer: signer.publicKey,
+    config: configPda,
+    mint,
     escrowTokenAccount: escrowTokenAccountPda,
     feeTokenAccount: feeTokenAccountPda,
     tokenProgram: utils.token.TOKEN_PROGRAM_ID,
-    systemProgram: web3.SystemProgram.programId,
   };
 
-  const txSignature = await pg.methods
-    .initialize(tokenDraftContestFeePercent)
-    .accounts(accounts)
-    .signers([signer])
-    .rpc();
+  const recentBlockhash = await connection.getLatestBlockhash();
+  const ixs0 = await pg.methods
+    .initConfig(tokenDraftContestFeePercent)
+    .accounts(initConfigAccounts)
+    .instruction();
+  const ixs1 = await pg.methods
+    .initTokenAccounts()
+    .accounts(initTokenAccountsAccounts)
+    .instruction();
+  const msg = new web3.TransactionMessage({
+    payerKey: signer.publicKey,
+    instructions: [ixs0, ixs1],
+    recentBlockhash: recentBlockhash.blockhash,
+  }).compileToV0Message();
+
+  const tx = new web3.VersionedTransaction(msg);
+  tx.sign([signer]);
+  const sig = await connection.sendTransaction(tx, { skipPreflight: false });
+  await connection.confirmTransaction({
+    blockhash: recentBlockhash.blockhash,
+    lastValidBlockHeight: recentBlockhash.lastValidBlockHeight,
+    signature: sig,
+  });
+  console.log("Tx signature:", sig);
 
   return {
-    txSignature,
+    txSignature: sig,
     configPda,
     contestMetadataPda,
     escrowTokenAccountPda,

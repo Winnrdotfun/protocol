@@ -29,9 +29,11 @@ export const fixtureBase = async (args: {
   const signersCount = args.numSigners || 10;
   const signers = [
     wallet.payer,
-    ...Array.from({ length: signersCount - 1 }, () => web3.Keypair.generate()),
+    // Generate fixed signers
+    ...Array.from({ length: signersCount - 1 }).map((_, i) =>
+      web3.Keypair.fromSeed(Buffer.from(Array(32).fill(i + 1)))
+    ),
   ];
-
   const signerTokenAccounts: Account[] = [];
 
   // Airdrop SOL to all signers
