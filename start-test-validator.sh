@@ -28,4 +28,5 @@ solana-test-validator \
   --clone 9vNb2tQoZ8bB4vzMbQLWViGwNaDJVtct13AGgno1wazp \
   --clone 5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn \
   --clone DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b \
+  --clone 2t8eUbYKjidMs3uSeYM9jXM9uudYZwGkSeTB4TKjmvnC \
   --clone EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v

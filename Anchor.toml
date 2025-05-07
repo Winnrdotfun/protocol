@@ -4,25 +4,22 @@
 resolution = true
 skip-lint = false
 
+[programs.devnet]
+protocol = "F21uWStbRzTLcPTk6fsmq7wX5Cj8R72jk6rc5FXPCXmk"
 
 [programs.localnet]
-protocol = "GYwkcJJiUrDnXKYiqMqxfA93h9MejpJbrBHJ73gnfr15"
-
-[programs.devnet]
-protocol = "GYwkcJJiUrDnXKYiqMqxfA93h9MejpJbrBHJ73gnfr15"
+protocol = "F21uWStbRzTLcPTk6fsmq7wX5Cj8R72jk6rc5FXPCXmk"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-# cluster = "Localnet"
-# cluster = "http://localhost:8899"
-# cluster = "https://api.mainnet-beta.solana.com"
-cluster = "https://api.devnet.solana.com"
-
+cluster = "Localnet"
+# cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
+create = "yarn run ts-node scripts/create.ts"
 deploy-init = "anchor deploy && yarn run ts-node scripts/initialize.ts"
 init = "yarn run ts-node scripts/initialize.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
@@ -67,3 +64,6 @@ address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn"
 
 [[test.validator.clone]]
 address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
+
+[[test.validator.clone]]
+address = "2t8eUbYKjidMs3uSeYM9jXM9uudYZwGkSeTB4TKjmvnC"
