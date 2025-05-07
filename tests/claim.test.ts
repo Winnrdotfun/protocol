@@ -12,6 +12,7 @@ import { HermesClient } from "@pythnetwork/hermes-client";
 import { Protocol } from "../target/types/protocol";
 import {
   enterContest,
+  postContestPrices,
   pythPriceFeedIds,
   resolveContest,
   UNITS_PER_USDC,
@@ -88,6 +89,17 @@ describe("claim", () => {
 
       console.log("enter:", txSignature);
     }
+
+    // Post prices
+    const postPricesRes = await postContestPrices({
+      program: pg,
+      signer: signers[0],
+      contestPda,
+      pythSolanaReceiver,
+      hermesClient: priceServiceConnection,
+    });
+    console.log("post prices:", postPricesRes.txSignatures);
+
     // Resolve contest
     const resolveRes = await resolveContest({
       program: pg,

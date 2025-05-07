@@ -50,6 +50,12 @@ pub mod protocol {
         enter::enter_token_draft_contest(ctx, credit_allocation)
     }
 
+    pub fn post_token_draft_contest_prices(
+        ctx: Context<PostTokenDraftContestPrices>,
+    ) -> Result<()> {
+        post_prices::post_token_draft_contest_prices(ctx)
+    }
+
     pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Result<()> {
         resolve::resolve_token_draft_contest(ctx)
     }
