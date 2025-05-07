@@ -10,19 +10,19 @@ import {
   unitsPerUsdc,
   wallet,
 } from "./config";
-import { hexToBase58 } from "./utils";
+import { hexToBase58, logEnvInfo } from "./utils";
 
 const { PublicKey } = web3;
 
 export const main = async () => {
-  console.log(`Executing script on: ${env} (${chainConfig.rpc})`);
+  logEnvInfo();
+
   const signer = wallet.payer;
   const programId = program.programId;
 
   const contestMetadata = await program.account.contestMetadata.fetch(
     contestMetadataPda
   );
-
   const [contestPda] = PublicKey.findProgramAddressSync(
     [
       Buffer.from("token_draft_contest"),
@@ -37,21 +37,21 @@ export const main = async () => {
   );
 
   const currentTime = Math.floor(Date.now() / 1000);
-  const startTime = new BN(currentTime + 60 * 60); // 1 hour from now
-  const endTime = new BN(startTime.toNumber() + 60 * 60 * 24); // 1 day from now
-  const entryFee = new BN(10 * unitsPerUsdc);
-  const maxEntries = 100;
+  const startTime = new BN(currentTime + 5 * 60); // 10 min from now
+  const endTime = new BN(startTime.toNumber() + 10 * 60); // 10 min from start
+  const entryFee = new BN(1 * unitsPerUsdc);
+  const maxEntries = 5;
   const priceFeedIds = [
-    pythPriceFeedIds.bonk,
     pythPriceFeedIds.popcat,
-    pythPriceFeedIds.wif,
+    pythPriceFeedIds.fartcoin,
     pythPriceFeedIds.trump,
   ];
   const tokenFeedIds = priceFeedIds.map((v) => new PublicKey(hexToBase58(v)));
   const feedAccounts = priceFeedIds.map((v) =>
     pythSolanaReceiver.getPriceFeedAccountAddress(0, v)
   );
-  const winnerRewardAllocation = [40, 20, 20, 10, 10];
+  // const winnerRewardAllocation = [40, 20, 20, 10, 10];
+  const winnerRewardAllocation = [50, 30, 20];
 
   const accounts = {
     signer: signer.publicKey,
@@ -65,7 +65,8 @@ export const main = async () => {
     feed4: feedAccounts[4] || null,
   };
 
-  const tx = await program.methods
+  const recentBlockhash = await connection.getLatestBlockhash();
+  const ixs = await program.methods
     .createTokenDraftContest(
       startTime,
       endTime,
@@ -75,18 +76,22 @@ export const main = async () => {
       Buffer.from(winnerRewardAllocation)
     )
     .accounts(accounts)
-    .transaction();
-
-  tx.recentBlockhash = await connection
-    .getLatestBlockhash()
-    .then((r) => r.blockhash);
-  tx.feePayer = wallet.publicKey;
-
-  const signedTx = await wallet.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signedTx.serialize(), {
-    skipPreflight: true,
+    .instruction();
+  const txMessage = new web3.TransactionMessage({
+    payerKey: signer.publicKey,
+    instructions: [ixs],
+    recentBlockhash: recentBlockhash.blockhash,
+  }).compileToV0Message();
+  const tx = new web3.VersionedTransaction(txMessage);
+  tx.sign([signer]);
+  // const sig = await connection.simulateTransaction(tx);
+  const sig = await connection.sendTransaction(tx, { skipPreflight: false });
+  await connection.confirmTransaction({
+    blockhash: recentBlockhash.blockhash,
+    lastValidBlockHeight: recentBlockhash.lastValidBlockHeight,
+    signature: sig,
   });
-  console.log("Creation tx signature:", sig);
+  console.log("Tx signature:", sig);
 };
 
 main()
@@ -94,5 +99,5 @@ main()
     console.log("Contest creation successful!");
   })
   .catch((error) => {
-    console.error("Error initializing program:", error);
+    console.error("Error:", error);
   });

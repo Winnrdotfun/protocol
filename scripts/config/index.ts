@@ -3,6 +3,7 @@ import path from "path";
 import {
   AnchorProvider,
   Program,
+  setProvider,
   Wallet,
   web3,
   workspace,
@@ -50,12 +51,14 @@ export const connection = new web3.Connection(chainConfig.rpc, "confirmed");
 export const walletKeypair = loadWalletKey(path.join(os.homedir(), walletPath));
 export const wallet = new Wallet(walletKeypair);
 export const provider = new AnchorProvider(connection, wallet);
+setProvider(provider);
 export const program = workspace.Protocol as Program<IWinnr>;
 
 export const pythSolanaReceiver = new PythSolanaReceiver({
   connection,
   wallet: wallet as any,
 });
+
 export const priceServiceConnection = new HermesClient(
   "https://hermes.pyth.network/",
   {}

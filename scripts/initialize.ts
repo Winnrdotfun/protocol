@@ -12,40 +12,54 @@ import {
   wallet,
 } from "./config";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { logEnvInfo } from "./utils";
 
 const tokenDraftContestFeePercent = 10;
 
 export const main = async () => {
-  console.log(`Executing script on: ${env} (${chainConfig.rpc})`);
-
   const signer = wallet.payer;
 
-  const accounts = {
+  logEnvInfo();
+
+  const initConfigAccounts = {
     signer: signer.publicKey,
     config: configPda,
     contestMetadata: contestMetadataPda,
     mint,
+  };
+  const initTokenAccountsAccounts = {
+    signer: signer.publicKey,
+    config: configPda,
+    mint,
     escrowTokenAccount: escrowTokenAccountPda,
     feeTokenAccount: feeTokenAccountPda,
     tokenProgram: TOKEN_PROGRAM_ID,
-    systemProgram: web3.SystemProgram.programId,
   };
 
-  const tx = await program.methods
-    .initialize(tokenDraftContestFeePercent)
-    .accounts(accounts)
-    .transaction();
-
-  tx.recentBlockhash = await connection
-    .getLatestBlockhash()
-    .then((r) => r.blockhash);
-  tx.feePayer = wallet.publicKey;
-
-  const signedTx = await wallet.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signedTx.serialize(), {
-    skipPreflight: true,
+  const recentBlockhash = await connection.getLatestBlockhash();
+  const ixs0 = await program.methods
+    .initConfig(tokenDraftContestFeePercent)
+    .accounts(initConfigAccounts)
+    .instruction();
+  const ixs1 = await program.methods
+    .initTokenAccounts()
+    .accounts(initTokenAccountsAccounts)
+    .instruction();
+  const txMessage = new web3.TransactionMessage({
+    payerKey: signer.publicKey,
+    instructions: [ixs0, ixs1],
+    recentBlockhash: recentBlockhash.blockhash,
+  }).compileToV0Message();
+  const tx = new web3.VersionedTransaction(txMessage);
+  tx.sign([signer]);
+  // const sig = await connection.simulateTransaction(tx);
+  const sig = await connection.sendTransaction(tx, { skipPreflight: false });
+  await connection.confirmTransaction({
+    blockhash: recentBlockhash.blockhash,
+    lastValidBlockHeight: recentBlockhash.lastValidBlockHeight,
+    signature: sig,
   });
-  console.log("Initialization tx signature:", sig);
+  console.log("Tx signature:", sig);
 };
 
 main()
