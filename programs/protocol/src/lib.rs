@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ephemeral_rollups_sdk::anchor::ephemeral;
 
 pub mod constants;
 pub mod errors;
@@ -9,6 +10,7 @@ use instructions::*;
 
 declare_id!("9bGeadnqYTmBhDTxA9KLLgiiY6k33fmsi1vm99AV23mE");
 
+#[ephemeral]
 #[program]
 pub mod protocol {
     use super::*;

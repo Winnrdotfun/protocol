@@ -9,10 +9,13 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
+use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
+use ephemeral_rollups_sdk::ephem::{commit_accounts, commit_and_undelegate_accounts};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
+#[commit]
 #[derive(Accounts)]
-pub struct ResolveTokenDraftContest<'info> {
+pub struct ResolveTokenDraftContestEr<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -63,7 +66,7 @@ pub struct ResolveTokenDraftContest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Result<()> {
+pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) -> Result<()> {
     let contest = &ctx.accounts.contest;
     let current_time = Clock::get()?.unix_timestamp as u64;
 
@@ -126,6 +129,16 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
     let total_pool_amount = ctx.accounts.contest.pool_amount() as f64;
     let fee_amount = (fee_frac * total_pool_amount).floor() as u64;
     ctx.accounts.contest_metadata.token_draft_contest_fee_amount += fee_amount;
+
+    commit_accounts(
+        &ctx.accounts.signer,
+        vec![
+            &ctx.accounts.contest_metadata.to_account_info(),
+            &ctx.accounts.contest.to_account_info(),
+        ],
+        &ctx.accounts.magic_context,
+        &ctx.accounts.magic_program,
+    )?;
 
     Ok(())
 }
