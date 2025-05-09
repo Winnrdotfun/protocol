@@ -64,6 +64,11 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
     let contest = &ctx.accounts.contest;
     let current_time = Clock::get()?.unix_timestamp as u64;
 
+    require!(
+        contest.token_start_prices.len() > 0,
+        ContestError::ContestPriceNotSet
+    );
+
     // Check that end time has passed
     require!(
         current_time > contest.end_time,

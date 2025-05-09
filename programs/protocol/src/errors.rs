@@ -24,4 +24,6 @@ pub enum ContestError {
     AlreadyResolved,
     NotWinner,
     InvalidRewardAllocation,
+    ContestNotStarted,
+    ContestPriceNotSet,
 }

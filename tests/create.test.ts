@@ -118,7 +118,7 @@ describe.only("create", () => {
         tokenFeedIds[i].toBase58()
       );
     }
-    expect(contest.tokenStartPrices.length).equal(tokenFeedIds.length);
+    expect(contest.tokenStartPrices.length).equal(0);
     expect(contest.tokenRois.length).equal(0);
     expect(contestCredits.contestKey.toBase58()).equal(contestPda.toBase58());
     expect(contestCredits.creditAllocations.length).equal(0);

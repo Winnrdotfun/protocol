@@ -17,13 +17,14 @@ import { Protocol } from "../target/types/protocol";
 import {
   ContestParams,
   enterContest,
+  postContestPrices,
   pythPriceFeedIds,
   UNITS_PER_USDC,
 } from "./helpers";
 import { fixtureWithContest } from "./fixtures";
 import { expect } from "chai";
 
-describe.only("resolve", () => {
+describe("resolve", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;
@@ -101,6 +102,15 @@ describe.only("resolve", () => {
 
       console.log("enter:", txSignature);
     }
+
+    const { txSignatures } = await postContestPrices({
+      program: pg,
+      signer: signers[0],
+      contestPda,
+      hermesClient: priceServiceConnection,
+      pythSolanaReceiver,
+    });
+    console.log("post prices:", txSignatures);
   });
 
   it("resolve a token draft contest", async () => {
