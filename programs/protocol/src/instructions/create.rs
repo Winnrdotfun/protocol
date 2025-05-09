@@ -86,11 +86,7 @@ pub fn create_token_draft_contest(
     }
 
     // Set contest parameters
-    contest.id = ctx
-        .accounts
-        .contest_metadata
-        // .load()?
-        .token_draft_contest_count;
+    contest.id = ctx.accounts.contest_metadata.token_draft_contest_count;
     contest.creator = ctx.accounts.signer.key();
     contest.start_time = start_time;
     contest.end_time = end_time;
