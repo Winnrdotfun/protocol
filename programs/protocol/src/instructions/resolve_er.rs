@@ -1,14 +1,10 @@
-use crate::constants::seeds::{
-    SEED_CONTEST_METADATA, SEED_ESCROW_TOKEN_ACCOUNT, SEED_FEE_TOKEN_ACCOUNT,
-};
+use crate::constants::seeds::{SEED_CONTEST_METADATA, SEED_PROGRAM_TOKEN_ACCOUNT};
 use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
 use crate::{constants::seeds::SEED_TOKEN_DRAFT_CONTEST_CREDITS, errors::ContestError};
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_spl::token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface};
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
 use ephemeral_rollups_sdk::ephem::{commit_accounts, commit_and_undelegate_accounts};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
@@ -42,18 +38,10 @@ pub struct ResolveTokenDraftContestEr<'info> {
     #[account(
         mut,
         token::mint = mint,
-        seeds = [SEED_ESCROW_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
+        seeds = [SEED_PROGRAM_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        mut,
-        token::mint = mint,
-        seeds = [SEED_FEE_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
-        bump
-    )]
-    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub program_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub feed0: Option<Box<Account<'info, PriceUpdateV2>>>,
     pub feed1: Option<Box<Account<'info, PriceUpdateV2>>>,

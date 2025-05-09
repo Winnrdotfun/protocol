@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::constants::seeds::{
-    SEED_CONFIG, SEED_CONTEST_METADATA, SEED_ESCROW_TOKEN_ACCOUNT, SEED_FEE_TOKEN_ACCOUNT,
-};
+use crate::constants::seeds::{SEED_CONFIG, SEED_CONTEST_METADATA, SEED_PROGRAM_TOKEN_ACCOUNT};
 use crate::errors::ConfigError;
 use crate::state::config::Config;
 use crate::state::metadata::ContestMetadata;
@@ -54,23 +52,12 @@ pub struct InitTokenAccounts<'info> {
         init,
         payer = signer,
         token::mint = mint,
-        token::authority = escrow_token_account,
+        token::authority = program_token_account,
         token::token_program = token_program,
-        seeds = [SEED_ESCROW_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
+        seeds = [SEED_PROGRAM_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        init,
-        payer = signer,
-        token::mint = mint,
-        token::authority = fee_token_account,
-        token::token_program = token_program,
-        seeds = [SEED_FEE_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
-        bump
-    )]
-    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub program_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 

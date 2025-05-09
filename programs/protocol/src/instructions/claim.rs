@@ -1,6 +1,5 @@
 use crate::constants::seeds::{
-    SEED_CONTEST_METADATA, SEED_ESCROW_TOKEN_ACCOUNT, SEED_FEE_TOKEN_ACCOUNT,
-    SEED_TOKEN_DRAFT_CONTEST_ENTRY,
+    SEED_CONTEST_METADATA, SEED_PROGRAM_TOKEN_ACCOUNT, SEED_TOKEN_DRAFT_CONTEST_ENTRY,
 };
 use crate::state::config::Config;
 use crate::state::contest::TokenDraftContest;
@@ -46,18 +45,10 @@ pub struct ClaimTokenDraftContest<'info> {
     #[account(
         mut,
         token::mint = mint,
-        seeds = [SEED_ESCROW_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
+        seeds = [SEED_PROGRAM_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        mut,
-        token::mint = mint,
-        seeds = [SEED_FEE_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
-        bump
-    )]
-    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub program_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
@@ -104,15 +95,15 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     // Transfer the reward to the user's token account
     let cpi_accounts = TransferChecked {
         mint: ctx.accounts.mint.to_account_info(),
-        from: ctx.accounts.escrow_token_account.to_account_info(),
+        from: ctx.accounts.program_token_account.to_account_info(),
         to: ctx.accounts.signer_token_account.to_account_info(),
-        authority: ctx.accounts.escrow_token_account.to_account_info(),
+        authority: ctx.accounts.program_token_account.to_account_info(),
     };
     let mint_key = ctx.accounts.mint.key();
     let signer_seeds: &[&[&[u8]]] = &[&[
-        SEED_ESCROW_TOKEN_ACCOUNT,
+        SEED_PROGRAM_TOKEN_ACCOUNT,
         &mint_key.as_ref(),
-        &[ctx.bumps.escrow_token_account],
+        &[ctx.bumps.program_token_account],
     ]];
     let cpi_program = ctx.accounts.token_program.to_account_info();
     let cpi_context = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);

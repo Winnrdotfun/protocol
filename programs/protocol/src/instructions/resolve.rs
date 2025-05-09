@@ -1,14 +1,9 @@
-use crate::constants::seeds::{
-    SEED_CONTEST_METADATA, SEED_ESCROW_TOKEN_ACCOUNT, SEED_FEE_TOKEN_ACCOUNT,
-};
+use crate::constants::seeds::SEED_CONTEST_METADATA;
 use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
 use crate::{constants::seeds::SEED_TOKEN_DRAFT_CONTEST_CREDITS, errors::ContestError};
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 #[derive(Accounts)]
@@ -33,32 +28,11 @@ pub struct ResolveTokenDraftContest<'info> {
     )]
     pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,
 
-    #[account(mut)]
-    pub mint: Box<InterfaceAccount<'info, Mint>>,
-
-    #[account(
-        mut,
-        token::mint = mint,
-        seeds = [SEED_ESCROW_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
-        bump
-    )]
-    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        mut,
-        token::mint = mint,
-        seeds = [SEED_FEE_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
-        bump
-    )]
-    pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
     pub feed0: Option<Box<Account<'info, PriceUpdateV2>>>,
     pub feed1: Option<Box<Account<'info, PriceUpdateV2>>>,
     pub feed2: Option<Box<Account<'info, PriceUpdateV2>>>,
     pub feed3: Option<Box<Account<'info, PriceUpdateV2>>>,
     pub feed4: Option<Box<Account<'info, PriceUpdateV2>>>,
-
-    pub token_program: Interface<'info, TokenInterface>,
 
     pub system_program: Program<'info, System>,
 }
