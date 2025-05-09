@@ -1,8 +1,12 @@
-use crate::errors::ContestError;
+use crate::constants::seeds::{
+    SEED_CONTEST_METADATA, SEED_ESCROW_TOKEN_ACCOUNT, SEED_FEE_TOKEN_ACCOUNT,
+    SEED_TOKEN_DRAFT_CONTEST_ENTRY,
+};
 use crate::state::config::Config;
 use crate::state::contest::TokenDraftContest;
 use crate::state::entry::TokenDraftContestEntry;
 use crate::state::metadata::ContestMetadata;
+use crate::{constants::seeds::SEED_CONFIG, errors::ContestError};
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
@@ -14,7 +18,7 @@ pub struct ClaimTokenDraftContest<'info> {
     pub signer: Signer<'info>,
 
     #[account(
-        seeds = [b"config"],
+        seeds = [SEED_CONFIG],
         bump
     )]
     pub config: Box<Account<'info, Config>>,
@@ -24,14 +28,14 @@ pub struct ClaimTokenDraftContest<'info> {
 
     #[account(
         mut,
-        seeds = [b"contest_metadata"],
+        seeds = [SEED_CONTEST_METADATA],
         bump
     )]
     pub contest_metadata: Box<Account<'info, ContestMetadata>>,
 
     #[account(
         mut,
-        seeds = [b"token_draft_contest_entry", contest.key().as_ref(), signer.key().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST_ENTRY, contest.key().as_ref(), signer.key().as_ref()],
         bump
     )]
     pub contest_entry: Box<Account<'info, TokenDraftContestEntry>>,
@@ -42,7 +46,7 @@ pub struct ClaimTokenDraftContest<'info> {
     #[account(
         mut,
         token::mint = mint,
-        seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
+        seeds = [SEED_ESCROW_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
         bump
     )]
     pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -50,7 +54,7 @@ pub struct ClaimTokenDraftContest<'info> {
     #[account(
         mut,
         token::mint = mint,
-        seeds = [b"fee_token_account", mint.key().to_bytes().as_ref()],
+        seeds = [SEED_FEE_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
         bump
     )]
     pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -90,7 +94,6 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     let fee_frac = ctx
         .accounts
         .contest_metadata
-        // .load()?
         .token_draft_contest_fee_percent as f64
         / 100.0;
     let total_pool_amount = contest.pool_amount();
@@ -107,7 +110,7 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     };
     let mint_key = ctx.accounts.mint.key();
     let signer_seeds: &[&[&[u8]]] = &[&[
-        b"escrow_token_account",
+        SEED_ESCROW_TOKEN_ACCOUNT,
         &mint_key.as_ref(),
         &[ctx.bumps.escrow_token_account],
     ]];

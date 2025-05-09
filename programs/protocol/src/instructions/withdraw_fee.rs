@@ -1,4 +1,7 @@
-use crate::state::config::Config;
+use crate::{
+    constants::seeds::{SEED_CONFIG, SEED_FEE_TOKEN_ACCOUNT},
+    state::config::Config,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
@@ -13,14 +16,14 @@ pub struct WithdrawFee<'info> {
     pub signer: Signer<'info>,
 
     #[account(
-        seeds = [b"config"],
+        seeds = [SEED_CONFIG],
         bump,
     )]
     pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
-        seeds = [b"fee_token_account", config.mint.key().to_bytes().as_ref()],
+        seeds = [SEED_FEE_TOKEN_ACCOUNT, config.mint.key().to_bytes().as_ref()],
         bump
     )]
     pub fee_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -48,7 +51,7 @@ pub fn withdraw_fee(ctx: Context<WithdrawFee>) -> Result<()> {
     };
     let mint_key = ctx.accounts.mint.key();
     let signer_seeds: &[&[&[u8]]] = &[&[
-        b"fee_token_account",
+        SEED_FEE_TOKEN_ACCOUNT,
         &mint_key.as_ref(),
         &[ctx.bumps.fee_token_account],
     ]];
