@@ -4,9 +4,9 @@ use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
 use crate::{constants::seeds::SEED_TOKEN_DRAFT_CONTEST_CREDITS, errors::ContestError};
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface};
-use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
-use ephemeral_rollups_sdk::ephem::{commit_accounts, commit_and_undelegate_accounts};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use ephemeral_rollups_sdk::anchor::{commit, MagicProgram};
+use ephemeral_rollups_sdk::ephem::commit_accounts;
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 #[commit]

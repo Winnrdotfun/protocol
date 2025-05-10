@@ -37,10 +37,12 @@ export const main = async () => {
   );
 
   const currentTime = Math.floor(Date.now() / 1000);
-  const startTime = new BN(currentTime + 5 * 60); // 10 min from now
-  const endTime = new BN(startTime.toNumber() + 10 * 60); // 10 min from start
+  // const startTime = new BN(currentTime + 10 * 60 * 60);
+  // const endTime = new BN(startTime.toNumber() + 8 * 60 * 60);
+  const startTime = new BN(currentTime + 10 * 60);
+  const endTime = new BN(startTime.toNumber() + 5 * 60);
   const entryFee = new BN(1 * unitsPerUsdc);
-  const maxEntries = 5;
+  const maxEntries = 3;
   const priceFeedIds = [
     pythPriceFeedIds.popcat,
     pythPriceFeedIds.fartcoin,
@@ -51,7 +53,7 @@ export const main = async () => {
     pythSolanaReceiver.getPriceFeedAccountAddress(0, v)
   );
   // const winnerRewardAllocation = [40, 20, 20, 10, 10];
-  const winnerRewardAllocation = [50, 30, 20];
+  const winnerRewardAllocation = [60, 40];
 
   const accounts = {
     signer: signer.publicKey,
