@@ -8,3 +8,6 @@ export const SEED_TOKEN_DRAFT_CONTEST_CREDITS = Buffer.from(
 export const SEED_TOKEN_DRAFT_CONTEST_ENTRY = Buffer.from(
   "token_draft_contest_entry"
 );
+
+export const ONE_HOUR = 60 * 60;
+export const ONE_DAY = 24 * 60 * 60;

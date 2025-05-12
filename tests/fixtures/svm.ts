@@ -2,13 +2,18 @@ import fs from "fs";
 import { LiteSVM } from "litesvm";
 import {
   AnchorProvider,
+  BN,
   Program,
   setProvider,
   web3,
   workspace,
 } from "@coral-xyz/anchor";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { sendSvmTransaction, USDC_DECIMALS } from "../helpers";
+import {
+  getCreateContestTx,
+  sendSvmTransaction,
+  USDC_DECIMALS,
+} from "../helpers";
 import { Account, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   createAssociateTokenAccount,
@@ -51,7 +56,7 @@ export const fixtureSvmBase = async (args: { numSigners?: number }) => {
     );
     const account = {
       lamports: accountData.account.lamports,
-      data: Buffer.from(accountData.account.data, "base64"),
+      data: Buffer.from(accountData.account.data[0], "base64"),
       owner: new web3.PublicKey(accountData.account.owner),
       executable: accountData.account.executable,
     };
@@ -64,7 +69,8 @@ export const fixtureSvmBase = async (args: { numSigners?: number }) => {
 
   // Generate fixed signers
   const signers = [
-    ...Array.from({ length: signersCount }).map((_, i) =>
+    provider.wallet.payer,
+    ...Array.from({ length: signersCount - 1 }).map((_, i) =>
       web3.Keypair.fromSeed(Buffer.from(Array(32).fill(i + 1)))
     ),
   ];
@@ -103,19 +109,6 @@ export const fixtureSvmBase = async (args: { numSigners?: number }) => {
     {}
   );
 
-  // Initialize the program
-  // const {
-  //   txSignature,
-  //   configPda,
-  //   contestMetadataPda,
-  //   escrowTokenAccountPda,
-  //   feeTokenAccountPda,
-  // } = await initializeProgram({
-  //   program,
-  //   provider,
-  //   initParams: { mint, tokenDraftContestFeePercent },
-  // });
-
   return {
     svm,
     signers,
@@ -125,11 +118,6 @@ export const fixtureSvmBase = async (args: { numSigners?: number }) => {
     priceServiceConnection,
     provider,
     program,
-    // initializeTxSignature: txSignature,
-    // configPda,
-    // contestMetadataPda,
-    // escrowTokenAccountPda,
-    // feeTokenAccountPda,
   };
 };
 
@@ -188,7 +176,7 @@ export const fixtureInitialization = async (args: { numSigners?: number }) => {
   const tx = new web3.VersionedTransaction(msg);
   tx.sign([signer]);
 
-  sendSvmTransaction(svm, tx);
+  sendSvmTransaction(svm, signer, tx);
 
   return {
     ...res,
@@ -198,43 +186,49 @@ export const fixtureInitialization = async (args: { numSigners?: number }) => {
   };
 };
 
-// export const fixtureWithContest = async (args: {
-//   provider: AnchorProvider;
-//   program: Program<IWinnr>;
-//   contestParams?: {
-//     startTime: number;
-//     endTime: number;
-//     entryFee: bigint;
-//     maxEntries: number;
-//     priceFeedIds: string[];
-//     rewardAllocation: number[];
-//   };
-//   numSigners?: number;
-// }) => {
-//   const { provider, program, contestParams } = args;
-//   const baseFixture = await fixtureSvmBase({ provider, program, ...args });
-//   const { pythSolanaReceiver, contestMetadataPda } = baseFixture;
+export const fixtureWithContest = async (args: {
+  contestParams: {
+    startTime: number;
+    endTime: number;
+    entryFee: bigint;
+    maxEntries: number;
+    priceFeedIds: string[];
+    rewardAllocation: number[];
+  };
+  numSigners?: number;
+}) => {
+  const { contestParams } = args;
+  const baseFixture = await fixtureInitialization(args);
+  const { svm, contestMetadataPda, program, pythSolanaReceiver, signers } =
+    baseFixture;
 
-//   const contestParams_ = {
-//     startTime: new BN(contestParams.startTime),
-//     endTime: new BN(contestParams.endTime),
-//     entryFee: new BN(contestParams.entryFee.toString()),
-//     maxEntries: contestParams.maxEntries,
-//     priceFeedIds: contestParams.priceFeedIds,
-//     rewardAllocation: contestParams.rewardAllocation,
-//   };
+  const signer = signers[0];
 
-//   // Create a contest
-//   const contestRes = await createContest({
-//     program,
-//     provider,
-//     pythSolanaReceiver,
-//     contestMetadataPda,
-//     contestParams: contestParams_,
-//   });
+  const contestParams_ = {
+    startTime: contestParams.startTime,
+    endTime: contestParams.endTime,
+    entryFee: contestParams.entryFee,
+    maxEntries: contestParams.maxEntries,
+    priceFeedIds: contestParams.priceFeedIds,
+    rewardAllocation: contestParams.rewardAllocation,
+  };
 
-//   return {
-//     ...baseFixture,
-//     ...contestRes,
-//   };
-// };
+  // Create a contest
+  const { tx, contestPda, contestCreditsPda } = await getCreateContestTx({
+    signer,
+    svm,
+    program,
+    contestMetadataPda,
+    contestParams: contestParams_,
+    pythSolanaReceiver,
+  });
+
+  const txInfo = sendSvmTransaction(svm, signer, tx);
+
+  return {
+    ...baseFixture,
+    txInfo,
+    contestPda,
+    contestCreditsPda,
+  };
+};

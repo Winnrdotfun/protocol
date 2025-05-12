@@ -10,7 +10,6 @@ import {
   TOKEN_PROGRAM_ID,
   unpackAccount,
 } from "@solana/spl-token";
-import { Signer } from "@solana/web3.js";
 
 export const createMint = (
   svm: LiteSVM,

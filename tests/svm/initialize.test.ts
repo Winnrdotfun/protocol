@@ -82,7 +82,7 @@ describe("initialize", () => {
     const tx = new web3.VersionedTransaction(msg);
     tx.sign([signer]);
 
-    sendSvmTransaction(svm, tx);
+    sendSvmTransaction(svm, signer, tx);
 
     const configAccInfo = svm.getAccount(configPda);
     const contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
