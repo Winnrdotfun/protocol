@@ -14,7 +14,8 @@ protocol = "9bGeadnqYTmBhDTxA9KLLgiiY6k33fmsi1vm99AV23mE"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
+# cluster = "Devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

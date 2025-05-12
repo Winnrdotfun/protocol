@@ -1,4 +1,4 @@
-import { web3, utils } from "@coral-xyz/anchor";
+import { web3 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { Account, TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token";
@@ -10,7 +10,6 @@ import {
   ONE_DAY,
   ONE_HOUR,
   pythPriceFeedIds,
-  SEED_TOKEN_DRAFT_CONTEST_ENTRY,
   sendSvmTransaction,
   UNITS_PER_USDC,
 } from "../helpers";
@@ -20,6 +19,7 @@ import { LiteSVM } from "litesvm";
 import { setSvmTimeTo } from "../helpers/time";
 import { expect } from "chai";
 import { createAssociateTokenAccount } from "../fixtures/helpers";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 describe.only("withdrawFee", () => {
   let svm: LiteSVM;
@@ -37,7 +37,6 @@ describe.only("withdrawFee", () => {
   let priceServiceConnection: HermesClient;
   let numWinners: number;
   const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
-  const numTokens: number = priceFeedIds.length;
 
   before(async () => {
     const currentTime = Math.floor(Date.now() / 1000);
@@ -133,9 +132,11 @@ describe.only("withdrawFee", () => {
     );
     const signer = signers[0];
 
+    const owner = web3.Keypair.generate();
+    svm.airdrop(owner.publicKey, BigInt(LAMPORTS_PER_SOL));
     const withdrawalTokenAccountAddress = createAssociateTokenAccount(
       svm,
-      signers[signers.length - 1],
+      owner,
       mint
     );
     const accounts = {
@@ -148,14 +149,6 @@ describe.only("withdrawFee", () => {
       tokenProgram: TOKEN_PROGRAM_ID,
     };
 
-    const withdrawalTokenAccountAccInfo = svm.getAccount(
-      withdrawalTokenAccountAddress
-    );
-    const withdrawalTokenAccount = unpackAccount(
-      withdrawalTokenAccountAddress,
-      withdrawalTokenAccountAccInfo as any
-    );
-
     const ixs = await pg.methods.withdrawFee().accounts(accounts).instruction();
     const msg = new web3.TransactionMessage({
       payerKey: signer.publicKey,
@@ -165,14 +158,15 @@ describe.only("withdrawFee", () => {
     const tx = new web3.VersionedTransaction(msg);
     sendSvmTransaction(svm, signer, tx);
 
-    const feeAmount = contestMetadata.tokenDraftContestFeeAmount.toString();
-    console.log("feeAmount", feeAmount);
-    const programTokenAccountAccInfo = svm.getAccount(programTokenAccountPda);
-    console.log(
-      "withdrawalTokenAccountAccInfo",
-      withdrawalTokenAccount.amount.toString()
+    const withdrawalTokenAccountAccInfo = svm.getAccount(
+      withdrawalTokenAccountAddress
+    );
+    const withdrawalTokenAccount = unpackAccount(
+      withdrawalTokenAccountAddress,
+      withdrawalTokenAccountAccInfo as any
     );
 
+    const feeAmount = contestMetadata.tokenDraftContestFeeAmount.toString();
     expect(withdrawalTokenAccount.amount.toString()).to.equal(feeAmount);
   });
 });
