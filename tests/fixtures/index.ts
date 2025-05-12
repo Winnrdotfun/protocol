@@ -117,15 +117,6 @@ export const fixtureWithContest = async (args: {
   const baseFixture = await fixtureBase({ provider, program, ...args });
   const { pythSolanaReceiver, contestMetadataPda } = baseFixture;
 
-  // const contestParams_ = {
-  //   startTime: contestParams.startTime,
-  //   endTime: contestParams.endTime,
-  //   entryFee: contestParams.entryFee,
-  //   maxEntries: contestParams.maxEntries,
-  //   priceFeedIds: contestParams.priceFeedIds,
-  //   rewardAllocation: contestParams.rewardAllocation,
-  // };
-
   // Create a contest
   const contestRes = await createContest({
     program,
