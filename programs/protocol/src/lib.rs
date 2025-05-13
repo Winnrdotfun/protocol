@@ -70,4 +70,12 @@ pub mod protocol {
     pub fn withdraw_fee(ctx: Context<WithdrawFee>) -> Result<()> {
         withdraw_fee::withdraw_fee(ctx)
     }
+
+    pub fn delegate_er(ctx: Context<DelegateEr>) -> Result<()> {
+        delegate_er::delegate_er(ctx)
+    }
+
+    pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) -> Result<()> {
+        resolve_er::resolve_token_draft_contest_er(ctx)
+    }
 }

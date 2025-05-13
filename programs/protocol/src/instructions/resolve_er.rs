@@ -6,7 +6,7 @@ use crate::{constants::seeds::SEED_TOKEN_DRAFT_CONTEST_CREDITS, errors::ContestE
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use ephemeral_rollups_sdk::anchor::{commit, MagicProgram};
-use ephemeral_rollups_sdk::ephem::commit_accounts;
+use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 #[commit]
@@ -118,7 +118,7 @@ pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) 
     let fee_amount = (fee_frac * total_pool_amount).floor() as u64;
     ctx.accounts.contest_metadata.token_draft_contest_fee_amount += fee_amount;
 
-    commit_accounts(
+    commit_and_undelegate_accounts(
         &ctx.accounts.signer,
         vec![
             &ctx.accounts.contest_metadata.to_account_info(),
