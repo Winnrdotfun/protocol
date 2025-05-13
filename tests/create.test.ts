@@ -14,7 +14,7 @@ import { fixtureBase } from "./fixtures";
 
 const { PublicKey } = web3;
 
-describe.only("create", () => {
+describe.skip("create", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;

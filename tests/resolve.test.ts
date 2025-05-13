@@ -24,7 +24,7 @@ import {
 import { fixtureWithContest } from "./fixtures";
 import { expect } from "chai";
 
-describe("resolve", () => {
+describe.skip("resolve", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;

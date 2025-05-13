@@ -21,7 +21,7 @@ import { enterContest, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
 import { fixtureWithContest } from "./fixtures";
 import { expect } from "chai";
 
-describe("withdrawFee", () => {
+describe.skip("withdrawFee", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;

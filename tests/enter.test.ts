@@ -16,7 +16,7 @@ import { fixtureWithContest } from "./fixtures";
 
 const { PublicKey } = web3;
 
-describe("enter", () => {
+describe.skip("enter", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;

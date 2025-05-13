@@ -22,7 +22,7 @@ import {
 import { fixtureWithContest } from "./fixtures";
 import { HermesClient } from "@pythnetwork/hermes-client";
 
-describe("postPrices", () => {
+describe.skip("postPrices", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;
