@@ -7,14 +7,14 @@ import {
   BN,
 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { Protocol } from "../target/types/protocol";
 import { hexToBase58, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
-import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { fixtureBase } from "./fixtures";
 
 const { PublicKey } = web3;
 
-describe.only("create", () => {
+describe("create", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const pg = workspace.Protocol as Program<Protocol>;

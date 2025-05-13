@@ -2,7 +2,10 @@ import { web3 } from "@coral-xyz/anchor";
 import { chainConfig, program } from "../config";
 
 const { PublicKey } = web3;
-const programId = program.programId;
+// const programId = program.programId;
+const programId = new web3.PublicKey(
+  "9bGeadnqYTmBhDTxA9KLLgiiY6k33fmsi1vm99AV23mE"
+);
 
 export const mint = new PublicKey(chainConfig.usdcAddress);
 
@@ -16,13 +19,8 @@ export const [contestMetadataPda] = PublicKey.findProgramAddressSync(
   programId
 );
 
-export const [escrowTokenAccountPda] = PublicKey.findProgramAddressSync(
-  [Buffer.from("escrow_token_account"), mint.toBuffer()],
-  programId
-);
-
-export const [feeTokenAccountPda] = PublicKey.findProgramAddressSync(
-  [Buffer.from("fee_token_account"), mint.toBuffer()],
+export const [programTokenAccountPda] = PublicKey.findProgramAddressSync(
+  [Buffer.from("token_account"), mint.toBuffer()],
   programId
 );
 
