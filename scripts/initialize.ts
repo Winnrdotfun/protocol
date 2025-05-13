@@ -1,11 +1,14 @@
 import { web3 } from "@coral-xyz/anchor";
 import {
+  chainConfig,
   configPda,
   connection,
   contestMetadataPda,
+  env,
+  escrowTokenAccountPda,
+  feeTokenAccountPda,
   mint,
   program,
-  programTokenAccountPda,
   wallet,
 } from "./config";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -28,7 +31,8 @@ export const main = async () => {
     signer: signer.publicKey,
     config: configPda,
     mint,
-    programTokenAccount: programTokenAccountPda,
+    escrowTokenAccount: escrowTokenAccountPda,
+    feeTokenAccount: feeTokenAccountPda,
     tokenProgram: TOKEN_PROGRAM_ID,
   };
 
