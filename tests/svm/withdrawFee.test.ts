@@ -21,7 +21,7 @@ import { expect } from "chai";
 import { createAssociateTokenAccount } from "../fixtures/helpers";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-describe.only("withdrawFee", () => {
+describe("withdrawFee", () => {
   let svm: LiteSVM;
   let pg: Program<Protocol>;
   let mint: web3.PublicKey;

@@ -30,8 +30,7 @@ describe("initialize", () => {
     signers = res.signers;
   });
 
-  it("is initialized", async () => {
-    console.log("Initializing...");
+  it("initialize program", async () => {
     const signer = signers[0];
     const [configPda] = PublicKey.findProgramAddressSync(
       [SEED_CONFIG],

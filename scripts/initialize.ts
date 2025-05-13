@@ -1,12 +1,9 @@
 import { web3 } from "@coral-xyz/anchor";
 import {
-  chainConfig,
   configPda,
   connection,
   contestMetadataPda,
-  env,
-  escrowTokenAccountPda,
-  feeTokenAccountPda,
+  programTokenAccountPda,
   mint,
   program,
   wallet,
@@ -31,8 +28,7 @@ export const main = async () => {
     signer: signer.publicKey,
     config: configPda,
     mint,
-    escrowTokenAccount: escrowTokenAccountPda,
-    feeTokenAccount: feeTokenAccountPda,
+    programTokenAccount: programTokenAccountPda,
     tokenProgram: TOKEN_PROGRAM_ID,
   };
 
