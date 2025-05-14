@@ -1,24 +1,29 @@
 import { expect } from "chai";
-import {
-  AnchorProvider,
-  setProvider,
-  web3,
-  workspace,
-  BN,
-} from "@coral-xyz/anchor";
+import { LiteSVM } from "litesvm";
+import { AnchorProvider, web3, BN } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Protocol } from "../target/types/protocol";
-import { hexToBase58, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { fixtureBase } from "./fixtures";
+import { fixtureInitialization } from "../fixtures/svm";
+import {
+  SEED_TOKEN_DRAFT_CONTEST,
+  SEED_TOKEN_DRAFT_CONTEST_CREDITS,
+} from "../helpers/constants";
+import {
+  hexToBase58,
+  pythPriceFeedIds,
+  sendSvmTransaction,
+  UNITS_PER_USDC,
+} from "../helpers";
+import { Protocol } from "../../target/types/protocol";
 
 const { PublicKey } = web3;
 
-describe.skip("create", () => {
-  const provider = AnchorProvider.env();
-  setProvider(provider);
-  const pg = workspace.Protocol as Program<Protocol>;
-  const programId = pg.programId;
+describe("create", () => {
+  let svm: LiteSVM;
+  let provider: AnchorProvider;
+  let pg: Program<Protocol>;
+  let programId: web3.PublicKey;
+
   let mint: web3.PublicKey;
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
@@ -26,30 +31,38 @@ describe.skip("create", () => {
   let pythSolanaReceiver: PythSolanaReceiver;
 
   before(async () => {
-    const res = await fixtureBase({ provider, program: pg });
+    const res = await fixtureInitialization({ numSigners: 10 });
+
+    provider = res.provider;
+    pg = res.program;
+    programId = res.program.programId;
+    svm = res.svm;
     signers = res.signers;
     mint = res.mint;
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
     pythSolanaReceiver = res.pythSolanaReceiver;
-    console.log("mint", mint.toBase58());
   });
 
   it("create a token draft contest", async () => {
     const signer = signers[0];
-    const contestMetadata = await pg.account.contestMetadata.fetch(
-      contestMetadataPda
+
+    const contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
+    const contestMetadata = pg.coder.accounts.decode(
+      "contestMetadata",
+      Buffer.from(contestMetadataAccInfo.data)
     );
+
     const [contestPda] = PublicKey.findProgramAddressSync(
       [
-        Buffer.from("token_draft_contest"),
+        SEED_TOKEN_DRAFT_CONTEST,
         contestMetadata.tokenDraftContestCount.toArrayLike(Buffer, "le", 8),
         signer.publicKey.toBuffer(),
       ],
       programId
     );
     const [contestCreditsPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("token_draft_contest_credits"), contestPda.toBuffer()],
+      [SEED_TOKEN_DRAFT_CONTEST_CREDITS, contestPda.toBuffer()],
       programId
     );
 
@@ -65,9 +78,12 @@ describe.skip("create", () => {
       pythPriceFeedIds.trump,
     ];
     const tokenFeedIds = priceFeedIds.map((v) => new PublicKey(hexToBase58(v)));
+
     const feedAccounts = priceFeedIds.map((v) =>
       pythSolanaReceiver.getPriceFeedAccountAddress(0, v)
     );
+
+    const acc = svm.getAccount(feedAccounts[0]);
     const winnerRewardAllocation = [40, 20, 20, 10, 10];
     const numWinners = winnerRewardAllocation.length;
 
@@ -83,7 +99,7 @@ describe.skip("create", () => {
       feed4: feedAccounts[4] || null,
     };
 
-    const sig = await pg.methods
+    const tx = await pg.methods
       .createTokenDraftContest(
         startTime,
         endTime,
@@ -93,14 +109,19 @@ describe.skip("create", () => {
         Buffer.from(winnerRewardAllocation)
       )
       .accounts(accounts)
-      .signers([signer])
-      .rpc();
-    console.log("Tx signature:", sig);
-    console.log("Contest PDA:", contestPda.toBase58());
+      .transaction();
 
-    const contest = await pg.account.tokenDraftContest.fetch(contestPda);
-    const contestCredits = await pg.account.tokenDraftContestCredits.fetch(
-      contestCreditsPda
+    sendSvmTransaction(svm, signer, tx);
+
+    const contestAccInfo = svm.getAccount(contestPda);
+    const contestCreditsAccInfo = svm.getAccount(contestCreditsPda);
+    const contest = pg.coder.accounts.decode(
+      "tokenDraftContest",
+      Buffer.from(contestAccInfo.data)
+    );
+    const contestCredits = pg.coder.accounts.decode(
+      "tokenDraftContestCredits",
+      Buffer.from(contestCreditsAccInfo.data)
     );
 
     expect(contest.id.toNumber()).equal(

@@ -13,7 +13,7 @@ import { getAccount } from "@solana/spl-token";
 
 const { PublicKey } = web3;
 
-describe("initialize", () => {
+describe.skip("initialize", () => {
   const provider = AnchorProvider.env();
   setProvider(provider);
   const connection = provider.connection;

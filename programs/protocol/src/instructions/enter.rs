@@ -3,6 +3,10 @@ use anchor_spl::token_interface::{
     transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
+use crate::constants::seeds::{
+    SEED_CONFIG, SEED_PROGRAM_TOKEN_ACCOUNT, SEED_TOKEN_DRAFT_CONTEST_CREDITS,
+    SEED_TOKEN_DRAFT_CONTEST_ENTRY,
+};
 use crate::errors::ContestError;
 use crate::state::config::Config;
 use crate::state::contest::TokenDraftContest;
@@ -15,7 +19,7 @@ pub struct EnterTokenDraftContest<'info> {
     pub signer: Signer<'info>,
 
     #[account(
-        seeds = [b"config"],
+        seeds = [SEED_CONFIG],
         bump
     )]
     pub config: Box<Account<'info, Config>>,
@@ -27,7 +31,7 @@ pub struct EnterTokenDraftContest<'info> {
         init,
         payer = signer,
         space = 8 + TokenDraftContestEntry::INIT_SPACE,
-        seeds = [b"token_draft_contest_entry", contest.key().as_ref(), signer.key().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST_ENTRY, contest.key().as_ref(), signer.key().as_ref()],
         bump,
     )]
     pub contest_entry: Box<Account<'info, TokenDraftContestEntry>>,
@@ -37,7 +41,7 @@ pub struct EnterTokenDraftContest<'info> {
         realloc = contest_credits.to_account_info().data_len() + 32,
         realloc::payer = signer,
         realloc::zero = false,
-        seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST_CREDITS, contest.key().as_ref()],
         bump
     )]
     pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,
@@ -48,10 +52,10 @@ pub struct EnterTokenDraftContest<'info> {
     #[account(
         mut,
         token::mint = mint,
-        seeds = [b"escrow_token_account", mint.key().to_bytes().as_ref()],
+        seeds = [SEED_PROGRAM_TOKEN_ACCOUNT, mint.key().to_bytes().as_ref()],
         bump
     )]
-    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub program_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
@@ -95,7 +99,7 @@ pub fn enter_token_draft_contest(
     let cpi_accounts = TransferChecked {
         mint: ctx.accounts.mint.to_account_info(),
         from: ctx.accounts.signer_token_account.to_account_info(),
-        to: ctx.accounts.escrow_token_account.to_account_info(),
+        to: ctx.accounts.program_token_account.to_account_info(),
         authority: ctx.accounts.signer.to_account_info(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();

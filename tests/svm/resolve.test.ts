@@ -1,41 +1,35 @@
-import {
-  AnchorProvider,
-  setProvider,
-  web3,
-  workspace,
-  utils,
-  BN,
-} from "@coral-xyz/anchor";
+import { web3, utils, BN } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   InstructionWithEphemeralSigners,
   PythSolanaReceiver,
 } from "@pythnetwork/pyth-solana-receiver";
-import { Account, getAccount } from "@solana/spl-token";
+import { Account, unpackAccount } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
-import { Protocol } from "../target/types/protocol";
 import {
   ContestParams,
-  enterContest,
-  postContestPrices,
+  getEnterContestTx,
+  getPostPricesTxs,
   pythPriceFeedIds,
+  sendSvmTransaction,
   UNITS_PER_USDC,
-} from "./helpers";
-import { fixtureWithContest } from "./fixtures";
+} from "../helpers";
 import { expect } from "chai";
+import { fixtureWithContest } from "../fixtures/svm";
+import { ONE_DAY, ONE_HOUR } from "../helpers";
+import { LiteSVM } from "litesvm";
+import { Protocol } from "../../target/types/protocol";
+import { setSvmTimeTo } from "../helpers/time";
 
-describe.skip("resolve", () => {
-  const provider = AnchorProvider.env();
-  setProvider(provider);
-  const pg = workspace.Protocol as Program<Protocol>;
-
+describe("resolve", () => {
+  let svm: LiteSVM;
+  let pg: Program<Protocol>;
   let mint: web3.PublicKey;
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
   let contestCreditsPda: web3.PublicKey;
   let contestPda: web3.PublicKey;
-  let escrowTokenAccountPda: web3.PublicKey;
-  let feeTokenAccountPda: web3.PublicKey;
+  let programTokenAccountPda: web3.PublicKey;
   let signers: web3.Keypair[];
   let signerTokenAccounts: Account[] = [];
 
@@ -49,8 +43,8 @@ describe.skip("resolve", () => {
 
   before(async () => {
     const currentTime = Math.floor(Date.now() / 1000);
-    const startTime = currentTime + 60 * 60; // 1 hour from now
-    const endTime = startTime + 60 * 60 * 24; // 1 day from now
+    const startTime = currentTime - ONE_DAY; // 1 day ago
+    const endTime = startTime + ONE_HOUR; // 1 hour from start
     contestParams = {
       startTime,
       endTime,
@@ -63,18 +57,18 @@ describe.skip("resolve", () => {
     numWinners = contestParams.rewardAllocation.length;
 
     const res = await fixtureWithContest({
-      provider,
-      program: pg,
       contestParams,
+      numSigners: 10,
     });
 
+    svm = res.svm;
+    pg = res.program;
     mint = res.mint;
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
     contestCreditsPda = res.contestCreditsPda;
     contestPda = res.contestPda;
-    escrowTokenAccountPda = res.escrowTokenAccountPda;
-    feeTokenAccountPda = res.feeTokenAccountPda;
+    programTokenAccountPda = res.programTokenAccountPda;
     signers = res.signers;
     signerTokenAccounts = res.signerTokenAccounts;
     pythSolanaReceiver = res.pythSolanaReceiver;
@@ -88,38 +82,53 @@ describe.skip("resolve", () => {
     numEntries = creditAllocations.length;
 
     for (let i = 0; i < creditAllocations.length; i++) {
-      const { txSignature } = await enterContest({
-        signer: signers[i],
+      const { tx } = await getEnterContestTx({
+        svm,
         program: pg,
         configPda,
         contestPda,
         mint,
-        escrowTokenAccountPda: escrowTokenAccountPda,
-        feeTokenAccountPda: feeTokenAccountPda,
+        programTokenAccountPda,
+        signer: signers[i],
         signerTokenAccount: signerTokenAccounts[i],
         creditAllocation: creditAllocations[i],
       });
 
-      console.log("enter:", txSignature);
+      sendSvmTransaction(svm, signers[i], tx);
     }
 
-    const { txSignatures } = await postContestPrices({
+    const { txs } = await getPostPricesTxs({
+      svm,
       program: pg,
       signer: signers[0],
       contestPda,
-      hermesClient: priceServiceConnection,
       pythSolanaReceiver,
+      hermesClient: priceServiceConnection,
     });
-    console.log("post prices:", txSignatures);
+
+    setSvmTimeTo(svm, contestParams.startTime + 1);
+
+    for (const tx of txs) {
+      sendSvmTransaction(svm, signers[0], tx);
+    }
   });
 
   it("resolve a token draft contest", async () => {
     const signer = signers[0];
     const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
-    const timestamp = Math.floor(Date.now() / 1000) - 60 * 60 * 24; // 1 day ago
+    let contestAccInfo = svm.getAccount(contestPda);
+    let contest = pg.coder.accounts.decode(
+      "tokenDraftContest",
+      Buffer.from(contestAccInfo.data)
+    );
+
+    // Reach end time to resolve
+    const endTimestamp = contest.endTime.toNumber();
+    setSvmTimeTo(svm, endTimestamp + 1);
+
     const priceUpdates =
       await priceServiceConnection.getPriceUpdatesAtTimestamp(
-        timestamp,
+        endTimestamp,
         priceFeedIds,
         { encoding: "base64" }
       );
@@ -141,8 +150,7 @@ describe.skip("resolve", () => {
           contestCredits: contestCreditsPda,
           contestMetadata: contestMetadataPda,
           mint,
-          escrowTokenAccount: escrowTokenAccountPda,
-          feeTokenAccount: feeTokenAccountPda,
+          programTokenAccount: programTokenAccountPda,
           feed0: priceUpdateAccounts[0],
           feed1: priceUpdateAccounts[1] || null,
           feed2: priceUpdateAccounts[2] || null,
@@ -164,41 +172,45 @@ describe.skip("resolve", () => {
         return [instruction];
       }
     );
-    const versionedTxs = await txBuilder.buildVersionedTransactions({
+    const txs = await txBuilder.buildVersionedTransactions({
       computeUnitPriceMicroLamports: 50000,
     });
 
-    const escrowTokenAccountBefore = await getAccount(
-      provider.connection,
-      escrowTokenAccountPda
-    );
-    const feeTokenAccountBefore = await getAccount(
-      provider.connection,
-      feeTokenAccountPda
-    );
-    expect(escrowTokenAccountBefore.amount.toString()).equal(
-      (contestParams.entryFee * BigInt(numEntries)).toString()
-    );
-    expect(feeTokenAccountBefore.amount.toString()).equal("0");
+    for (let i = 0; i < txs.length; i++) {
+      const tx = txs[i].tx;
+      const signers = txs[i].signers;
 
-    const sigs = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
-      skipPreflight: false,
-    });
+      const ixs = web3.TransactionMessage.decompile(tx.message).instructions;
+      const msg = new web3.TransactionMessage({
+        payerKey: signer.publicKey,
+        instructions: ixs,
+        recentBlockhash: svm.latestBlockhash(),
+      }).compileToV0Message();
+      const vtx = new web3.VersionedTransaction(msg);
+      vtx.sign([...signers]);
+      sendSvmTransaction(svm, signer, vtx);
+    }
 
-    console.log("signatures:", sigs);
-
-    const contest = await pg.account.tokenDraftContest.fetch(contestPda);
-    const contestMetadata = await pg.account.contestMetadata.fetch(
-      contestMetadataPda
+    contestAccInfo = svm.getAccount(contestPda);
+    contest = pg.coder.accounts.decode(
+      "tokenDraftContest",
+      Buffer.from(contestAccInfo.data)
     );
 
-    const escrowTokenAccountAfter = await getAccount(
-      provider.connection,
-      escrowTokenAccountPda
+    contestAccInfo = svm.getAccount(contestPda);
+    const contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
+    const programTokenAccountAccInfo = svm.getAccount(programTokenAccountPda);
+    contest = pg.coder.accounts.decode(
+      "tokenDraftContest",
+      Buffer.from(contestAccInfo.data)
     );
-    const feeTokenAccount = await getAccount(
-      provider.connection,
-      feeTokenAccountPda
+    const contestMetadata = pg.coder.accounts.decode(
+      "contestMetadata",
+      Buffer.from(contestMetadataAccInfo.data)
+    );
+    const programTokenAccount = unpackAccount(
+      programTokenAccountPda,
+      programTokenAccountAccInfo as any
     );
 
     const totalPoolAmount = contest.entryFee.mul(new BN(contest.numEntries));
@@ -209,9 +221,11 @@ describe.skip("resolve", () => {
     expect(contest.numEntries).equal(numEntries);
     expect(contest.winnerIds.length).equal(numWinners);
     expect(contest.tokenRois.length).equal(numTokens);
-    expect(feeAmount.toString()).equal(feeTokenAccount.amount.toString());
-    expect(escrowTokenAccountAfter.amount.toString()).equal(
-      totalPoolAmount.sub(feeAmount).toString()
+    expect(programTokenAccount.amount.toString()).equal(
+      totalPoolAmount.toString()
+    );
+    expect(contestMetadata.tokenDraftContestFeeAmount.toString()).equal(
+      feeAmount.toString()
     );
   });
 });

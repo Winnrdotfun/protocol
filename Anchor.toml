@@ -5,16 +5,17 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-protocol = "9bGeadnqYTmBhDTxA9KLLgiiY6k33fmsi1vm99AV23mE"
+protocol = "3xA3kyUTzM9Pa24qSKQDdZmd9JoiD4UBAqJCsSckYeeZ"
 
 [programs.localnet]
-protocol = "9bGeadnqYTmBhDTxA9KLLgiiY6k33fmsi1vm99AV23mE"
+protocol = "3xA3kyUTzM9Pa24qSKQDdZmd9JoiD4UBAqJCsSckYeeZ"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
+# cluster = "Devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
@@ -22,6 +23,7 @@ create = "yarn run ts-node scripts/create.ts"
 deploy-init = "anchor deploy && yarn run ts-node scripts/initialize.ts"
 init = "yarn run ts-node scripts/initialize.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
+test2 = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
 
 [test]
 startup_wait = 10000

@@ -1,3 +1,6 @@
+use crate::constants::seeds::{
+    SEED_CONTEST_METADATA, SEED_TOKEN_DRAFT_CONTEST, SEED_TOKEN_DRAFT_CONTEST_CREDITS,
+};
 use crate::errors::ContestError;
 use crate::state::contest::{TokenDraftContest, MAX_TOKEN_PER_DRAFT};
 use crate::state::credit::TokenDraftContestCredits;
@@ -12,7 +15,7 @@ pub struct CreateTokenDraftContest<'info> {
 
     #[account(
         mut,
-        seeds = [b"contest_metadata"],
+        seeds = [SEED_CONTEST_METADATA],
         bump
     )]
     pub contest_metadata: Box<Account<'info, ContestMetadata>>,
@@ -21,7 +24,7 @@ pub struct CreateTokenDraftContest<'info> {
         init,
         payer = signer,
         space = 8 + TokenDraftContest::INIT_SPACE,
-        seeds = [b"token_draft_contest", contest_metadata.token_draft_contest_count.to_le_bytes().as_ref(), signer.key().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST, contest_metadata.token_draft_contest_count.to_le_bytes().as_ref(), signer.key().as_ref()],
         bump
     )]
     pub contest: Box<Account<'info, TokenDraftContest>>,
@@ -30,7 +33,7 @@ pub struct CreateTokenDraftContest<'info> {
         init,
         payer = signer,
         space = 8 + TokenDraftContest::INIT_SPACE,
-        seeds = [b"token_draft_contest_credits", contest.key().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST_CREDITS, contest.key().as_ref()],
         bump
     )]
     pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,

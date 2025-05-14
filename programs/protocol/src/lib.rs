@@ -1,13 +1,16 @@
 use anchor_lang::prelude::*;
+use ephemeral_rollups_sdk::anchor::ephemeral;
 
+pub mod constants;
 pub mod errors;
 pub mod instructions;
 pub mod state;
 
 use instructions::*;
 
-declare_id!("9bGeadnqYTmBhDTxA9KLLgiiY6k33fmsi1vm99AV23mE");
+declare_id!("3xA3kyUTzM9Pa24qSKQDdZmd9JoiD4UBAqJCsSckYeeZ");
 
+#[ephemeral]
 #[program]
 pub mod protocol {
     use super::*;
@@ -66,5 +69,13 @@ pub mod protocol {
 
     pub fn withdraw_fee(ctx: Context<WithdrawFee>) -> Result<()> {
         withdraw_fee::withdraw_fee(ctx)
+    }
+
+    pub fn delegate_er(ctx: Context<DelegateEr>) -> Result<()> {
+        delegate_er::delegate_er(ctx)
+    }
+
+    pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) -> Result<()> {
+        resolve_er::resolve_token_draft_contest_er(ctx)
     }
 }

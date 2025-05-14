@@ -1,40 +1,34 @@
 import { expect } from "chai";
-import {
-  AnchorProvider,
-  setProvider,
-  web3,
-  workspace,
-  utils,
-} from "@coral-xyz/anchor";
+import { AnchorProvider, web3, utils } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   InstructionWithEphemeralSigners,
   PythSolanaReceiver,
 } from "@pythnetwork/pyth-solana-receiver";
 import { Account } from "@solana/spl-token";
-import { Protocol } from "../target/types/protocol";
+import { HermesClient } from "@pythnetwork/hermes-client";
+import { LiteSVM } from "litesvm";
+import { fixtureWithContest } from "../fixtures/svm";
+import { Protocol } from "../../target/types/protocol";
 import {
   ContestParams,
   now,
   pythPriceFeedIds,
+  sendSvmTransaction,
   UNITS_PER_USDC,
-} from "./helpers";
-import { fixtureWithContest } from "./fixtures";
-import { HermesClient } from "@pythnetwork/hermes-client";
+} from "../helpers";
+import { setSvmTimeTo } from "../helpers/time";
 
-describe.skip("postPrices", () => {
-  const provider = AnchorProvider.env();
-  setProvider(provider);
-  const connection = provider.connection;
-  const pg = workspace.Protocol as Program<Protocol>;
-  const programId = pg.programId;
+describe("postPrices", () => {
+  let pg: Program<Protocol>;
+  let provider: AnchorProvider;
+  let svm: LiteSVM;
 
   let mint: web3.PublicKey;
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
   let contestPda: web3.PublicKey;
-  let escrowTokenAccountPda: web3.PublicKey;
-  let feeTokenAccountPda: web3.PublicKey;
+  let programTokenAccountPda: web3.PublicKey;
   let signers: web3.Keypair[];
   let signerTokenAccounts: Account[];
   let pythSolanaReceiver: PythSolanaReceiver;
@@ -42,9 +36,9 @@ describe.skip("postPrices", () => {
   let contestParams: ContestParams;
 
   before(async () => {
-    const currentTime = Math.floor(Date.now() / 1000);
-    const startTime = currentTime + 60 * 60; // 1 hour from now
-    const endTime = startTime + 60 * 60 * 24; // 1 day from now
+    const currentTime = now();
+    const startTime = currentTime - 24 * 60 * 60; // 1 day ago
+    const endTime = startTime + 60 * 60; // 1 hour from start
     contestParams = {
       startTime,
       endTime,
@@ -55,17 +49,19 @@ describe.skip("postPrices", () => {
     };
 
     const res = await fixtureWithContest({
-      provider,
-      program: pg,
       contestParams,
+      numSigners: 10,
     });
+
+    provider = res.provider;
+    pg = res.program;
+    svm = res.svm;
     signers = res.signers;
     mint = res.mint;
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
     contestPda = res.contestPda;
-    escrowTokenAccountPda = res.escrowTokenAccountPda;
-    feeTokenAccountPda = res.feeTokenAccountPda;
+    programTokenAccountPda = res.programTokenAccountPda;
     pythSolanaReceiver = res.pythSolanaReceiver;
     signerTokenAccounts = res.signerTokenAccounts;
     priceServiceConnection = res.priceServiceConnection;
@@ -73,14 +69,21 @@ describe.skip("postPrices", () => {
 
   it("post token draft contest prices", async () => {
     const signer = signers[0];
+    let contestAccInfo = svm.getAccount(contestPda);
+    let contest = pg.coder.accounts.decode(
+      "tokenDraftContest",
+      Buffer.from(contestAccInfo.data)
+    );
+    const startTimestamp = contest.startTime.toNumber();
 
-    let contest = await pg.account.tokenDraftContest.fetch(contestPda);
+    // Pass the start time
+    const clock = svm.getClock();
+    clock.unixTimestamp = BigInt(startTimestamp + 1);
+    svm.setClock(clock);
 
     const priceFeedIds = contest.tokenFeedIds.map(
       (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
     );
-    const startTimestamp = now() - 60 * 60 * 24; // 1 hour ago
-    // const endTimestamp = contest.endTime.toNumber();
     const priceUpdates =
       await priceServiceConnection.getPriceUpdatesAtTimestamp(
         startTimestamp,
@@ -88,6 +91,7 @@ describe.skip("postPrices", () => {
         { encoding: "base64" }
       );
     const priceUpdatesData = priceUpdates.binary.data;
+
     const txBuilder = pythSolanaReceiver.newTransactionBuilder({
       closeUpdateAccounts: true,
     });
@@ -123,19 +127,33 @@ describe.skip("postPrices", () => {
       }
     );
 
-    const versionedTxs = await txBuilder.buildVersionedTransactions({
+    // Pass the start time
+    setSvmTimeTo(svm, startTimestamp + 1);
+
+    const txs = await txBuilder.buildVersionedTransactions({
       computeUnitPriceMicroLamports: 50000,
     });
 
-    const txSignatures = await pythSolanaReceiver.provider.sendAll(
-      versionedTxs,
-      {
-        skipPreflight: false,
-      }
-    );
-    console.log("txSignatures", txSignatures);
+    for (let i = 0; i < txs.length; i++) {
+      const tx = txs[i].tx;
+      const signers = txs[i].signers;
 
-    contest = await pg.account.tokenDraftContest.fetch(contestPda);
+      const ixs = web3.TransactionMessage.decompile(tx.message).instructions;
+      const msg = new web3.TransactionMessage({
+        payerKey: signer.publicKey,
+        instructions: ixs,
+        recentBlockhash: svm.latestBlockhash(),
+      }).compileToV0Message();
+      const vtx = new web3.VersionedTransaction(msg);
+      vtx.sign([...signers]);
+      sendSvmTransaction(svm, signer, vtx);
+    }
+
+    contestAccInfo = svm.getAccount(contestPda);
+    contest = pg.coder.accounts.decode(
+      "tokenDraftContest",
+      Buffer.from(contestAccInfo.data)
+    );
     expect(contest.tokenStartPrices.length).equal(priceFeedIds.length);
   });
 });
