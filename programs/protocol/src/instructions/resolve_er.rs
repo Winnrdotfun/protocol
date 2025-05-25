@@ -1,4 +1,5 @@
 use crate::constants::seeds::{SEED_CONTEST_METADATA, SEED_PROGRAM_TOKEN_ACCOUNT};
+use crate::instructions::{calc_avg_roi, get_token_roi};
 use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
@@ -130,31 +131,4 @@ pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) 
     )?;
 
     Ok(())
-}
-
-fn get_token_roi(
-    clock: &Clock,
-    start_price: f64,
-    _feed_id: &Pubkey,
-    feed: &Account<'_, PriceUpdateV2>,
-) -> Result<f64> {
-    let maximum_age = 60;
-    let feed_id = _feed_id.to_bytes();
-    // let price_data = feed.get_price_no_older_than(clock, maximum_age, &feed_id)?;
-    let price_data = feed.get_price_unchecked(&feed_id)?;
-    let exp = (-price_data.exponent) as u32;
-    let price = (price_data.price as u64 as f64) / (10u64.pow(exp) as f64);
-    let delta = price - start_price;
-    let roi = (delta / start_price) * 100.0;
-    Ok(roi)
-}
-
-fn calc_avg_roi(allocation: &[u8], token_rois: &Vec<f64>) -> f64 {
-    let mut avg_roi = 0.0;
-
-    for (i, &alloc) in allocation.iter().enumerate() {
-        avg_roi += ((alloc as f64) / 100.0) * token_rois[i];
-    }
-
-    avg_roi
 }

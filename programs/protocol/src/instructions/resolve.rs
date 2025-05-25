@@ -105,7 +105,7 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
     Ok(())
 }
 
-fn get_token_roi(
+pub fn get_token_roi(
     clock: &Clock,
     start_price: f64,
     _feed_id: &Pubkey,
@@ -122,7 +122,7 @@ fn get_token_roi(
     Ok(roi)
 }
 
-fn calc_avg_roi(allocation: &[u8], token_rois: &Vec<f64>) -> f64 {
+pub fn calc_avg_roi(allocation: &[u8], token_rois: &Vec<f64>) -> f64 {
     let mut avg_roi = 0.0;
 
     for (i, &alloc) in allocation.iter().enumerate() {
