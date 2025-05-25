@@ -2,6 +2,7 @@ use crate::constants::seeds::SEED_CONTEST_METADATA;
 use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
+use crate::utils::roi::find_top_n_rois;
 use crate::{constants::seeds::SEED_TOKEN_DRAFT_CONTEST_CREDITS, errors::ContestError};
 use anchor_lang::prelude::*;
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
@@ -85,7 +86,7 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
 
     // Find the top N users
     let num_top_users = ctx.accounts.contest.winner_reward_allocation.len();
-    let winners = find_top_n(&user_avg_rois, num_top_users);
+    let winners = find_top_n_rois(&user_avg_rois, num_top_users);
 
     // Store the top N users
     ctx.accounts.contest.winner_ids = winners.iter().map(|v| v.0 as u32).collect();
@@ -119,65 +120,6 @@ fn get_token_roi(
     let delta = price - start_price;
     let roi = (delta / start_price) * 100.0;
     Ok(roi)
-}
-
-fn find_top_n(user_avg_rois: &Vec<(usize, f64)>, n: usize) -> Vec<(usize, f64)> {
-    let num_entries = user_avg_rois.len();
-
-    if user_avg_rois.len() <= n {
-        let mut x = user_avg_rois.clone();
-        x.sort_by(|a, b| b.1.total_cmp(&a.1));
-        return x;
-    }
-
-    let mut min_heap = Vec::with_capacity(n);
-    for i in 0..n {
-        min_heap.push(user_avg_rois[i]);
-    }
-
-    min_heapify(&mut min_heap);
-
-    for i in n..num_entries {
-        if user_avg_rois[i].1 > min_heap[0].1 {
-            min_heap[0] = user_avg_rois[i];
-            sift_down(&mut min_heap, 0);
-        }
-    }
-
-    min_heap.sort_by(|a, b| b.1.total_cmp(&a.1));
-
-    min_heap
-}
-
-fn min_heapify(arr: &mut Vec<(usize, f64)>) {
-    let len = arr.len();
-    for i in (0..len / 2).rev() {
-        sift_down(arr, i);
-    }
-}
-
-fn sift_down(arr: &mut Vec<(usize, f64)>, mut root: usize) {
-    let len = arr.len();
-    loop {
-        let left = 2 * root + 1;
-        let right = 2 * root + 2;
-        let mut smallest = root;
-
-        if left < len && arr[left].1 < arr[smallest].1 {
-            smallest = left;
-        }
-
-        if right < len && arr[right].1 < arr[smallest].1 {
-            smallest = right;
-        }
-
-        if smallest == root {
-            break;
-        }
-
-        arr.swap(root, smallest);
-        root = smallest;
-    }
 }
 
 fn calc_avg_roi(allocation: &[u8], token_rois: &Vec<f64>) -> f64 {
