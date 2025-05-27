@@ -140,7 +140,7 @@ describe("create", () => {
       );
     }
     expect(contest.tokenStartPrices.length).equal(0);
-    expect(contest.tokenRois.length).equal(0);
+    expect(contest.tokenEndPrices.length).equal(0);
     expect(contestCredits.contestKey.toBase58()).equal(contestPda.toBase58());
     expect(contestCredits.creditAllocations.length).equal(0);
     expect(contest.winnerIds.length).equal(0);

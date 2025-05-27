@@ -13,6 +13,7 @@ import { Protocol } from "../../target/types/protocol";
 import {
   ContestParams,
   now,
+  ONE_DAY,
   pythPriceFeedIds,
   sendSvmTransaction,
   UNITS_PER_USDC,
@@ -37,8 +38,8 @@ describe("postPrices", () => {
 
   before(async () => {
     const currentTime = now();
-    const startTime = currentTime - 24 * 60 * 60; // 1 day ago
-    const endTime = startTime + 60 * 60; // 1 hour from start
+    const startTime = currentTime - 2 * ONE_DAY; // 2 days ago
+    const endTime = startTime + ONE_DAY; // 1 day from start
     contestParams = {
       startTime,
       endTime,
@@ -75,41 +76,68 @@ describe("postPrices", () => {
       Buffer.from(contestAccInfo.data)
     );
     const startTimestamp = contest.startTime.toNumber();
+    const endTimestamp = contest.endTime.toNumber();
 
     // Pass the start time
-    const clock = svm.getClock();
-    clock.unixTimestamp = BigInt(startTimestamp + 1);
-    svm.setClock(clock);
+    setSvmTimeTo(svm, startTimestamp + 1);
 
     const priceFeedIds = contest.tokenFeedIds.map(
       (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
     );
-    const priceUpdates =
+    const startPriceUpdates =
       await priceServiceConnection.getPriceUpdatesAtTimestamp(
         startTimestamp,
         priceFeedIds,
         { encoding: "base64" }
       );
-    const priceUpdatesData = priceUpdates.binary.data;
+    const startPriceUpdatesData = startPriceUpdates.binary.data;
+    // console.log("startPriceUpdatesData", startPriceUpdatesData);
+
+    const endPriceUpdates =
+      await priceServiceConnection.getPriceUpdatesAtTimestamp(
+        endTimestamp,
+        priceFeedIds,
+        { encoding: "base64" }
+      );
+    const endPriceUpdatesData = endPriceUpdates.binary.data;
 
     const txBuilder = pythSolanaReceiver.newTransactionBuilder({
       closeUpdateAccounts: true,
     });
-    await txBuilder.addPostPriceUpdates(priceUpdatesData);
+    const {
+      postInstructions: endPricePostInstructions,
+      closeInstructions: endPriceCloseInstructions,
+      priceFeedIdToPriceUpdateAccount: endPriceFeedIdToPriceUpdateAccount,
+    } = await pythSolanaReceiver.buildPostPriceUpdateInstructions(
+      endPriceUpdatesData
+    );
+
+    await txBuilder.addPostPriceUpdates(startPriceUpdatesData);
+    txBuilder.addInstructions(endPricePostInstructions);
+    txBuilder.closeInstructions.push(...endPriceCloseInstructions);
+
     await txBuilder.addPriceConsumerInstructions(
       async (getPriceUpdateAccount) => {
-        const priceUpdateAccounts = priceFeedIds.map((id) =>
+        const startPriceUpdateAccounts = priceFeedIds.map((id) =>
           getPriceUpdateAccount(id)
+        );
+        const endPriceUpdateAccounts = priceFeedIds.map(
+          (id) => endPriceFeedIdToPriceUpdateAccount[id]
         );
 
         const accounts = {
           signer: signer.publicKey,
           contest: contestPda,
-          feed0: priceUpdateAccounts[0],
-          feed1: priceUpdateAccounts[1] || null,
-          feed2: priceUpdateAccounts[2] || null,
-          feed3: priceUpdateAccounts[3] || null,
-          feed4: priceUpdateAccounts[4] || null,
+          startPriceFeed0: startPriceUpdateAccounts[0],
+          startPriceFeed1: startPriceUpdateAccounts[1] || null,
+          startPriceFeed2: startPriceUpdateAccounts[2] || null,
+          startPriceFeed3: startPriceUpdateAccounts[3] || null,
+          startPriceFeed4: startPriceUpdateAccounts[4] || null,
+          endPriceFeed0: endPriceUpdateAccounts[0],
+          endPriceFeed1: endPriceUpdateAccounts[1] || null,
+          endPriceFeed2: endPriceUpdateAccounts[2] || null,
+          endPriceFeed3: endPriceUpdateAccounts[3] || null,
+          endPriceFeed4: endPriceUpdateAccounts[4] || null,
           tokenProgram: utils.token.TOKEN_PROGRAM_ID,
         };
 
@@ -127,8 +155,8 @@ describe("postPrices", () => {
       }
     );
 
-    // Pass the start time
-    setSvmTimeTo(svm, startTimestamp + 1);
+    // Pass the end time
+    setSvmTimeTo(svm, endTimestamp + 1);
 
     const txs = await txBuilder.buildVersionedTransactions({
       computeUnitPriceMicroLamports: 50000,
@@ -154,6 +182,8 @@ describe("postPrices", () => {
       "tokenDraftContest",
       Buffer.from(contestAccInfo.data)
     );
+
     expect(contest.tokenStartPrices.length).equal(priceFeedIds.length);
+    expect(contest.tokenEndPrices.length).equal(priceFeedIds.length);
   });
 });

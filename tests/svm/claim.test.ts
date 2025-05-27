@@ -181,7 +181,6 @@ describe("claim", () => {
     );
 
     expect(contest.winnerIds.length).to.equal(numWinners);
-    expect(contest.tokenRois.length).to.equal(numTokens);
     // expect(programTokenAccount.amount.toNumber()).to.equal(
   });
 });

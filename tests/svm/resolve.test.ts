@@ -106,7 +106,7 @@ describe("resolve", () => {
       hermesClient: priceServiceConnection,
     });
 
-    setSvmTimeTo(svm, contestParams.startTime + 1);
+    setSvmTimeTo(svm, contestParams.endTime + 1);
 
     for (const tx of txs) {
       sendSvmTransaction(svm, signers[0], tx);
@@ -220,7 +220,6 @@ describe("resolve", () => {
     expect(contest.isResolved).equal(true);
     expect(contest.numEntries).equal(numEntries);
     expect(contest.winnerIds.length).equal(numWinners);
-    expect(contest.tokenRois.length).equal(numTokens);
     expect(programTokenAccount.amount.toString()).equal(
       totalPoolAmount.toString()
     );

@@ -5,7 +5,6 @@ use crate::state::metadata::ContestMetadata;
 use crate::utils::roi::find_top_n_rois;
 use crate::{constants::seeds::SEED_TOKEN_DRAFT_CONTEST_CREDITS, errors::ContestError};
 use anchor_lang::prelude::*;
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 #[derive(Accounts)]
 pub struct ResolveTokenDraftContest<'info> {
@@ -29,12 +28,6 @@ pub struct ResolveTokenDraftContest<'info> {
     )]
     pub contest_credits: Box<Account<'info, TokenDraftContestCredits>>,
 
-    pub feed0: Option<Box<Account<'info, PriceUpdateV2>>>,
-    pub feed1: Option<Box<Account<'info, PriceUpdateV2>>>,
-    pub feed2: Option<Box<Account<'info, PriceUpdateV2>>>,
-    pub feed3: Option<Box<Account<'info, PriceUpdateV2>>>,
-    pub feed4: Option<Box<Account<'info, PriceUpdateV2>>>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -53,42 +46,33 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
         ContestError::ContestNotEnded
     );
 
+    // Check that contest is not already resolved
     require!(!contest.is_resolved, ContestError::AlreadyResolved);
 
-    let feed_accounts: Vec<&Option<Box<Account<'_, PriceUpdateV2>>>> = vec![
-        &ctx.accounts.feed0,
-        &ctx.accounts.feed1,
-        &ctx.accounts.feed2,
-        &ctx.accounts.feed3,
-        &ctx.accounts.feed4,
-    ];
-
-    let clock = Clock::get()?;
+    // Calculate the ROI by each token
+    let num_tokens = contest.token_feed_ids.len();
     let mut token_rois: Vec<f64> = Vec::new();
-    for (i, feed_id) in contest.token_feed_ids.iter().enumerate() {
-        require!(feed_accounts[i].is_some(), ContestError::InvalidFeeds);
-        let feed_account = feed_accounts[i].as_ref().unwrap();
+    for i in 0..num_tokens {
         let start_price = contest.token_start_prices[i];
-        let price = get_token_roi(&clock, start_price, &feed_id, feed_account)?;
-        token_rois.push(price);
+        let end_price = contest.token_end_prices[i];
+        let roi = ((end_price - start_price) / start_price) * 100.0;
+        token_rois.push(roi);
     }
-    ctx.accounts.contest.token_rois = token_rois.clone();
 
-    // Calculate the average ROI for each user
+    // Calculate the average ROI of each user
     let num_entries = ctx.accounts.contest.num_entries as usize;
-    let num_tokens = ctx.accounts.contest.token_feed_ids.len();
     let credit_allocations = &ctx.accounts.contest_credits.credit_allocations;
     let mut user_avg_rois: Vec<(usize, f64)> = Vec::with_capacity(num_entries);
     for i in 0..num_entries {
         let alloc = &credit_allocations[(i * num_tokens)..(i * num_tokens + num_tokens)];
-        user_avg_rois.push((i, calc_avg_roi(alloc, &token_rois)))
+        user_avg_rois.push((i, calc_avg_roi(alloc, &token_rois)));
     }
 
-    // Find the top N users
+    // Find the top n users
     let num_top_users = ctx.accounts.contest.winner_reward_allocation.len();
     let winners = find_top_n_rois(&user_avg_rois, num_top_users);
 
-    // Store the top N users
+    // Store the top n users
     ctx.accounts.contest.winner_ids = winners.iter().map(|v| v.0 as u32).collect();
     ctx.accounts.contest.is_resolved = true;
 
@@ -103,23 +87,6 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
     ctx.accounts.contest_metadata.token_draft_contest_fee_amount += fee_amount;
 
     Ok(())
-}
-
-pub fn get_token_roi(
-    clock: &Clock,
-    start_price: f64,
-    _feed_id: &Pubkey,
-    feed: &Account<'_, PriceUpdateV2>,
-) -> Result<f64> {
-    let maximum_age = 60;
-    let feed_id = _feed_id.to_bytes();
-    // let price_data = feed.get_price_no_older_than(clock, maximum_age, &feed_id)?;
-    let price_data = feed.get_price_unchecked(&feed_id)?;
-    let exp = (-price_data.exponent) as u32;
-    let price = (price_data.price as u64 as f64) / (10u64.pow(exp) as f64);
-    let delta = price - start_price;
-    let roi = (delta / start_price) * 100.0;
-    Ok(roi)
 }
 
 pub fn calc_avg_roi(allocation: &[u8], token_rois: &Vec<f64>) -> f64 {

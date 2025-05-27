@@ -150,35 +150,60 @@ export const getPostPricesTxs = async (args: {
     contest = await pg.account.tokenDraftContest.fetch(contestPda);
   }
   const startTimestamp = contest.startTime.toNumber();
+  const endTimestamp = contest.endTime.toNumber();
 
   const priceFeedIds = contest.tokenFeedIds.map(
     (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
   );
-  const priceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
+  const startPriceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
     startTimestamp,
     priceFeedIds,
     { encoding: "base64" }
   );
-  const priceUpdatesData = priceUpdates.binary.data;
+  const startPriceUpdatesData = startPriceUpdates.binary.data;
+  const endPriceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
+    endTimestamp,
+    priceFeedIds,
+    { encoding: "base64" }
+  );
+  const endPriceUpdatesData = endPriceUpdates.binary.data;
+  const {
+    postInstructions: endPricePostInstructions,
+    closeInstructions: endPriceCloseInstructions,
+    priceFeedIdToPriceUpdateAccount: endPriceFeedIdToPriceUpdateAccount,
+  } = await pythSolanaReceiver.buildPostPriceUpdateInstructions(
+    endPriceUpdatesData
+  );
 
   const txBuilder = pythSolanaReceiver.newTransactionBuilder({
     closeUpdateAccounts: true,
   });
-  await txBuilder.addPostPriceUpdates(priceUpdatesData);
+  await txBuilder.addPostPriceUpdates(startPriceUpdatesData);
+  txBuilder.addInstructions(endPricePostInstructions);
+  txBuilder.closeInstructions.push(...endPriceCloseInstructions);
+
   await txBuilder.addPriceConsumerInstructions(
     async (getPriceUpdateAccount) => {
-      const priceUpdateAccounts = priceFeedIds.map((id) =>
+      const startPriceUpdateAccounts = priceFeedIds.map((id) =>
         getPriceUpdateAccount(id)
+      );
+      const endPriceUpdateAccounts = priceFeedIds.map(
+        (id) => endPriceFeedIdToPriceUpdateAccount[id]
       );
 
       const accounts = {
         signer: signer.publicKey,
         contest: contestPda,
-        feed0: priceUpdateAccounts[0],
-        feed1: priceUpdateAccounts[1] || null,
-        feed2: priceUpdateAccounts[2] || null,
-        feed3: priceUpdateAccounts[3] || null,
-        feed4: priceUpdateAccounts[4] || null,
+        startPriceFeed0: startPriceUpdateAccounts[0],
+        startPriceFeed1: startPriceUpdateAccounts[1] || null,
+        startPriceFeed2: startPriceUpdateAccounts[2] || null,
+        startPriceFeed3: startPriceUpdateAccounts[3] || null,
+        startPriceFeed4: startPriceUpdateAccounts[4] || null,
+        endPriceFeed0: endPriceUpdateAccounts[0],
+        endPriceFeed1: endPriceUpdateAccounts[1] || null,
+        endPriceFeed2: endPriceUpdateAccounts[2] || null,
+        endPriceFeed3: endPriceUpdateAccounts[3] || null,
+        endPriceFeed4: endPriceUpdateAccounts[4] || null,
         tokenProgram: utils.token.TOKEN_PROGRAM_ID,
       };
 
