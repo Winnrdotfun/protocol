@@ -6,6 +6,7 @@ pub mod initialize;
 pub mod post_prices;
 pub mod resolve;
 pub mod resolve_er;
+pub mod withdraw;
 pub mod withdraw_fee;
 
 pub use claim::*;
@@ -16,4 +17,5 @@ pub use initialize::*;
 pub use post_prices::*;
 pub use resolve::*;
 pub use resolve_er::*;
+pub use withdraw::*;
 pub use withdraw_fee::*;

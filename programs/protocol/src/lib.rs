@@ -69,7 +69,7 @@ pub mod protocol {
     }
 
     pub fn withdraw_fee(ctx: Context<WithdrawFee>) -> Result<()> {
-        withdraw_fee::withdraw_fee(ctx)
+        withdraw_fee::withdraw_contest_fee(ctx)
     }
 
     pub fn delegate_er(ctx: Context<DelegateEr>) -> Result<()> {
@@ -78,5 +78,9 @@ pub mod protocol {
 
     pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) -> Result<()> {
         resolve_er::resolve_token_draft_contest_er(ctx)
+    }
+
+    pub fn withdraw_entry_fee(ctx: Context<Withdraw>) -> Result<()> {
+        withdraw::withdraw_entry_fee(ctx)
     }
 }

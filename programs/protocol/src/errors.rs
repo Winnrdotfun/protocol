@@ -13,7 +13,7 @@ pub enum ContestError {
     InvalidDuration,
     ContestStillActive,
     InsufficientAmount,
-    AlreadyClaimed,
+    AlreadyClaimedOrWithdrawn,
     InvalidDraftTokenCount,
     InvalidFeeds,
     InvalidDraftTokenDistribution,
@@ -25,5 +25,7 @@ pub enum ContestError {
     NotWinner,
     InvalidRewardAllocation,
     ContestNotStarted,
-    ContestPriceNotSet,
+    ContestPricesNotSet,
+    ContestPricesAlreadySet,
+    ContestNotCancelled,
 }
