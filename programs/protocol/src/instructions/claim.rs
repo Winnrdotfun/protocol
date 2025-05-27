@@ -1,11 +1,10 @@
 use crate::constants::seeds::{
     SEED_CONTEST_METADATA, SEED_PROGRAM_TOKEN_ACCOUNT, SEED_TOKEN_DRAFT_CONTEST_ENTRY,
 };
-use crate::state::config::Config;
+use crate::errors::ContestError;
 use crate::state::contest::TokenDraftContest;
 use crate::state::entry::TokenDraftContestEntry;
 use crate::state::metadata::ContestMetadata;
-use crate::{constants::seeds::SEED_CONFIG, errors::ContestError};
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
@@ -15,12 +14,6 @@ use anchor_spl::token_interface::{
 pub struct ClaimTokenDraftContest<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-
-    #[account(
-        seeds = [SEED_CONFIG],
-        bump
-    )]
-    pub config: Box<Account<'info, Config>>,
 
     #[account(mut)]
     pub contest: Box<Account<'info, TokenDraftContest>>,
@@ -70,7 +63,10 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     require!(contest.is_resolved, ContestError::ContestNotResolved);
 
     // Check if the user has already claimed their rewards
-    require!(!contest_entry.has_claimed, ContestError::AlreadyClaimed);
+    require!(
+        !contest_entry.has_claimed_or_withdrawn,
+        ContestError::AlreadyClaimedOrWithdrawn
+    );
 
     let pos_opt = contest
         .winner_ids
@@ -110,7 +106,7 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     transfer_checked(cpi_context, user_reward_amount, ctx.accounts.mint.decimals)?;
 
     // Mark the entry as claimed
-    contest_entry.has_claimed = true;
+    contest_entry.has_claimed_or_withdrawn = true;
 
     Ok(())
 }

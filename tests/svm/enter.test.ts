@@ -135,7 +135,7 @@ describe("enter", () => {
     for (let i = 0; i < creditAllocation.length; i++) {
       expect(contestEntry.creditAllocation[i]).equal(creditAllocation[i]);
     }
-    expect(contestEntry.hasClaimed).equal(false);
+    expect(contestEntry.hasClaimedOrWithdrawn).equal(false);
     expect(programTokenAccount.amount.toString()).equal(
       new BN(10 * UNITS_PER_USDC).toString()
     );
