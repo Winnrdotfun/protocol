@@ -33,21 +33,22 @@ pub struct ResolveTokenDraftContest<'info> {
 
 pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Result<()> {
     let contest = &ctx.accounts.contest;
-    let current_time = Clock::get()?.unix_timestamp as u64;
-
-    require!(
-        contest.token_start_prices.len() > 0,
-        ContestError::ContestPriceNotSet
-    );
-
-    // Check that end time has passed
-    require!(
-        current_time > contest.end_time,
-        ContestError::ContestNotEnded
-    );
 
     // Check that contest is not already resolved
     require!(!contest.is_resolved, ContestError::AlreadyResolved);
+
+    // Check that end time has passed
+    require!(contest.has_ended(), ContestError::ContestNotEnded);
+
+    // Check that contest has sufficient entries
+    if contest.has_insufficient_entries() {
+        // If not enough entries, cancel the contest without any winners
+        ctx.accounts.contest.is_resolved = true;
+        return Ok(());
+    }
+
+    // Check start and end prices are set
+    require!(contest.has_prices(), ContestError::ContestPricesNotSet);
 
     // Calculate the ROI by each token
     let num_tokens = contest.token_feed_ids.len();
@@ -69,8 +70,8 @@ pub fn resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContest>) -> Re
     }
 
     // Find the top n users
-    let num_top_users = ctx.accounts.contest.winner_reward_allocation.len();
-    let winners = find_top_n_rois(&user_avg_rois, num_top_users);
+    let num_winners = ctx.accounts.contest.winner_reward_allocation.len();
+    let winners = find_top_n_rois(&user_avg_rois, num_winners);
 
     // Store the top n users
     ctx.accounts.contest.winner_ids = winners.iter().map(|v| v.0 as u32).collect();

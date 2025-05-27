@@ -43,6 +43,14 @@ impl TokenDraftContest {
         current_time < self.start_time
     }
 
+    pub fn has_insufficient_entries(&self) -> bool {
+        self.num_entries < self.winner_reward_allocation.len() as u32
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.is_resolved && self.winner_ids.is_empty()
+    }
+
     pub fn has_ended(&self) -> bool {
         let current_time = Clock::get().unwrap().unix_timestamp as u64;
         current_time > self.end_time
@@ -50,5 +58,10 @@ impl TokenDraftContest {
 
     pub fn pool_amount(&self) -> u64 {
         self.entry_fee * self.num_entries as u64
+    }
+
+    pub fn has_prices(&self) -> bool {
+        let num_tokens = self.token_feed_ids.len();
+        self.token_start_prices.len() == num_tokens && self.token_end_prices.len() == num_tokens
     }
 }

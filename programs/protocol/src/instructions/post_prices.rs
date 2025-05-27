@@ -27,10 +27,11 @@ pub struct PostTokenDraftContestPrices<'info> {
 }
 
 pub fn post_token_draft_contest_prices(ctx: Context<PostTokenDraftContestPrices>) -> Result<()> {
-    require!(
-        ctx.accounts.contest.has_ended(),
-        ContestError::ContestNotEnded
-    );
+    let contest = &mut ctx.accounts.contest;
+
+    require!(contest.has_ended(), ContestError::ContestNotEnded);
+
+    require!(!contest.has_prices(), ContestError::ContestPricesAlreadySet);
 
     // Set start and end prices for each token
     let start_price_feed_accounts: Vec<&Option<Box<Account<'_, PriceUpdateV2>>>> = vec![
@@ -53,7 +54,7 @@ pub fn post_token_draft_contest_prices(ctx: Context<PostTokenDraftContestPrices>
     let mut token_start_prices: Vec<f64> = Vec::new();
     let mut token_end_prices: Vec<f64> = Vec::new();
 
-    for (i, feed_id) in ctx.accounts.contest.token_feed_ids.iter().enumerate() {
+    for (i, feed_id) in contest.token_feed_ids.iter().enumerate() {
         require!(
             start_price_feed_accounts[i].is_some() && end_price_feed_accounts[i].is_some(),
             ContestError::InvalidFeeds
@@ -74,8 +75,8 @@ pub fn post_token_draft_contest_prices(ctx: Context<PostTokenDraftContestPrices>
         token_end_prices.push(end_price);
     }
 
-    ctx.accounts.contest.token_start_prices = token_start_prices;
-    ctx.accounts.contest.token_end_prices = token_end_prices;
+    contest.token_start_prices = token_start_prices;
+    contest.token_end_prices = token_end_prices;
 
     Ok(())
 }
