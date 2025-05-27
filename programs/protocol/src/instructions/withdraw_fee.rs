@@ -47,7 +47,7 @@ pub struct WithdrawFee<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn withdraw_fee(ctx: Context<WithdrawFee>) -> Result<()> {
+pub fn withdraw_contest_fee(ctx: Context<WithdrawFee>) -> Result<()> {
     let total_fee_amount = ctx.accounts.contest_metadata.token_draft_contest_fee_amount;
 
     // Transfer the fee to the signer
