@@ -13,14 +13,14 @@ import {
   SEED_TOKEN_DRAFT_CONTEST_ENTRY,
   sendSvmTransaction,
   UNITS_PER_USDC,
-} from "../helpers";
-import { Protocol } from "../../target/types/protocol";
-import { fixtureWithContest } from "../fixtures/svm";
+} from "./helpers";
+import { Protocol } from "../target/types/protocol";
+import { fixtureWithContest } from "./fixtures/svm";
 import { LiteSVM } from "litesvm";
-import { setSvmTimeTo } from "../helpers/time";
+import { setSvmTimeTo } from "./helpers/time";
 import { expect } from "chai";
 
-describe("claim", () => {
+describe("withdraw", () => {
   let svm: LiteSVM;
   let pg: Program<Protocol>;
   let mint: web3.PublicKey;
@@ -35,6 +35,7 @@ describe("claim", () => {
   let pythSolanaReceiver: PythSolanaReceiver;
   let priceServiceConnection: HermesClient;
   let numWinners: number;
+  let numEntries: number;
   const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
   const numTokens: number = priceFeedIds.length;
 
@@ -74,8 +75,9 @@ describe("claim", () => {
       [40, 60],
       [75, 25],
     ];
+    numEntries = creditAllocations.length;
 
-    for (let i = 0; i < creditAllocations.length; i++) {
+    for (let i = 0; i < numWinners - 1; i++) {
       const { tx } = await getEnterContestTx({
         svm,
         signer: signers[i],
@@ -124,16 +126,16 @@ describe("claim", () => {
     }
   });
 
-  it("claim a token draft contest reward", async () => {
+  it("withdraw a token draft contest entry fee", async () => {
     let contestAccInfo = svm.getAccount(contestPda);
     let contest = pg.coder.accounts.decode(
       "tokenDraftContest",
       Buffer.from(contestAccInfo.data)
     );
-    const winnerIds = contest.winnerIds;
 
-    for (const winnerId of winnerIds) {
-      const signer = signers[winnerId];
+    for (let i = 0; i < numWinners - 1; i++) {
+      const signer = signers[i];
+      const signerTokenAccount = signerTokenAccounts[i];
       const [contestEntryPda] = web3.PublicKey.findProgramAddressSync(
         [
           SEED_TOKEN_DRAFT_CONTEST_ENTRY,
@@ -145,28 +147,26 @@ describe("claim", () => {
 
       const accounts = {
         signer: signer.publicKey,
-        config: configPda,
         contest: contestPda,
-        contestMetadata: contestMetadataPda,
         contestEntry: contestEntryPda,
         mint,
         programTokenAccount: programTokenAccountPda,
-        signerTokenAccount: signerTokenAccounts[winnerId].address,
+        signerTokenAccount: signerTokenAccount.address,
         tokenProgram: utils.token.TOKEN_PROGRAM_ID,
       };
 
-      const tx = await pg.methods
-        .claimTokenDraftContest()
+      const ix = await pg.methods
+        .withdrawEntryFee()
         .accounts(accounts)
         .instruction();
 
       const msg = new web3.TransactionMessage({
         payerKey: signer.publicKey,
-        instructions: [tx],
+        instructions: [ix],
         recentBlockhash: svm.latestBlockhash(),
       }).compileToV0Message();
-      const vtx = new web3.VersionedTransaction(msg);
-      sendSvmTransaction(svm, signer, vtx);
+      const tx = new web3.VersionedTransaction(msg);
+      sendSvmTransaction(svm, signers[i], tx);
     }
 
     contestAccInfo = svm.getAccount(contestPda);
@@ -174,13 +174,14 @@ describe("claim", () => {
       "tokenDraftContest",
       Buffer.from(contestAccInfo.data)
     );
+
     const programTokenAccountAccInfo = svm.getAccount(programTokenAccountPda);
     const programTokenAccount = unpackAccount(
       programTokenAccountPda,
       programTokenAccountAccInfo as any
     );
 
-    expect(contest.winnerIds.length).to.equal(numWinners);
-    // expect(programTokenAccount.amount.toNumber()).to.equal(
+    expect(contest.winnerIds.length).to.equal(0);
+    expect(programTokenAccount.amount.toString()).to.equal("0");
   });
 });

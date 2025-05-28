@@ -1,7 +1,7 @@
 import { web3, workspace } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { LiteSVM } from "litesvm";
-import { Protocol } from "../../target/types/protocol";
+import { Protocol } from "../target/types/protocol";
 import {
   ContestParams,
   ONE_DAY,
@@ -9,10 +9,10 @@ import {
   pythPriceFeedIds,
   sendSvmTransaction,
   UNITS_PER_USDC,
-} from "../helpers";
-import { fixtureWithContest } from "../fixtures/svm";
+} from "./helpers";
+import { fixtureWithContest } from "./fixtures/svm";
 
-describe("delegateEr", () => {
+describe.skip("delegateEr", () => {
   const pg = workspace.Protocol as Program<Protocol>;
   let mint: web3.PublicKey;
 

@@ -1,51 +1,47 @@
-import {
-  AnchorProvider,
-  setProvider,
-  web3,
-  workspace,
-  utils,
-} from "@coral-xyz/anchor";
+import { web3 } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import {
-  InstructionWithEphemeralSigners,
-  PythSolanaReceiver,
-} from "@pythnetwork/pyth-solana-receiver";
-import {
-  Account,
-  getAccount,
-  getOrCreateAssociatedTokenAccount,
-} from "@solana/spl-token";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import { Account, TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
+import {
+  getEnterContestTx,
+  getPostPricesTxs,
+  getResolveContestTx,
+  ONE_DAY,
+  ONE_HOUR,
+  pythPriceFeedIds,
+  sendSvmTransaction,
+  UNITS_PER_USDC,
+} from "./helpers";
 import { Protocol } from "../target/types/protocol";
-import { enterContest, pythPriceFeedIds, UNITS_PER_USDC } from "./helpers";
-import { fixtureWithContest } from "./fixtures";
+import { fixtureWithContest } from "./fixtures/svm";
+import { LiteSVM } from "litesvm";
+import { setSvmTimeTo } from "./helpers/time";
 import { expect } from "chai";
+import { createAssociateTokenAccount } from "./fixtures/helpers";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-describe.skip("withdrawFee", () => {
-  const provider = AnchorProvider.env();
-  setProvider(provider);
-  const pg = workspace.Protocol as Program<Protocol>;
-
+describe("withdrawFee", () => {
+  let svm: LiteSVM;
+  let pg: Program<Protocol>;
   let mint: web3.PublicKey;
   let configPda: web3.PublicKey;
   let contestMetadataPda: web3.PublicKey;
   let contestCreditsPda: web3.PublicKey;
   let contestPda: web3.PublicKey;
-  let escrowTokenAccountPda: web3.PublicKey;
-  let feeTokenAccountPda: web3.PublicKey;
+  let programTokenAccountPda: web3.PublicKey;
   let signers: web3.Keypair[];
   let signerTokenAccounts: Account[] = [];
 
   let pythSolanaReceiver: PythSolanaReceiver;
   let priceServiceConnection: HermesClient;
+  let numWinners: number;
   const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
-  let numEntries;
-  let numWinners;
 
   before(async () => {
     const currentTime = Math.floor(Date.now() / 1000);
-    const startTime = currentTime + 60 * 60; // 1 hour from now
-    const endTime = startTime + 60 * 60 * 24; // 1 day from now
+    const startTime = currentTime - ONE_DAY; // 1 day ago
+    const endTime = startTime + ONE_HOUR; // 1 hour from start
     const contestParams = {
       startTime,
       endTime,
@@ -54,22 +50,20 @@ describe.skip("withdrawFee", () => {
       priceFeedIds,
       rewardAllocation: [75, 25],
     };
-
     numWinners = contestParams.rewardAllocation.length;
 
     const res = await fixtureWithContest({
-      provider,
-      program: pg,
       contestParams,
     });
 
+    svm = res.svm;
+    pg = res.program;
     mint = res.mint;
     configPda = res.configPda;
     contestMetadataPda = res.contestMetadataPda;
     contestCreditsPda = res.contestCreditsPda;
     contestPda = res.contestPda;
-    escrowTokenAccountPda = res.escrowTokenAccountPda;
-    feeTokenAccountPda = res.feeTokenAccountPda;
+    programTokenAccountPda = res.programTokenAccountPda;
     signers = res.signers;
     signerTokenAccounts = res.signerTokenAccounts;
     pythSolanaReceiver = res.pythSolanaReceiver;
@@ -80,151 +74,99 @@ describe.skip("withdrawFee", () => {
       [40, 60],
       [75, 25],
     ];
-    numEntries = creditAllocations.length;
 
     for (let i = 0; i < creditAllocations.length; i++) {
-      const { txSignature } = await enterContest({
+      const { tx } = await getEnterContestTx({
+        svm,
         signer: signers[i],
         program: pg,
         configPda,
         contestPda,
         mint,
-        escrowTokenAccountPda: escrowTokenAccountPda,
-        feeTokenAccountPda: feeTokenAccountPda,
+        programTokenAccountPda,
         signerTokenAccount: signerTokenAccounts[i],
         creditAllocation: creditAllocations[i],
       });
 
-      console.log("enter:", txSignature);
+      sendSvmTransaction(svm, signers[i], tx);
+    }
+
+    setSvmTimeTo(svm, contestParams.endTime + 1);
+
+    // Post prices
+    const { txs: txsPostPrices } = await getPostPricesTxs({
+      svm,
+      program: pg,
+      signer: signers[0],
+      contestPda,
+      pythSolanaReceiver,
+      hermesClient: priceServiceConnection,
+    });
+    for (const tx of txsPostPrices) {
+      sendSvmTransaction(svm, signers[0], tx);
+    }
+
+    // Resolve contest
+    const { txs: txResolve } = await getResolveContestTx({
+      svm,
+      program: pg,
+      signer: signers[0],
+      mint,
+      contestPda,
+      contestCreditsPda,
+      contestMetadataPda,
+      programTokenAccountPda,
+      hermesClient: priceServiceConnection,
+      pythSolanaReceiver,
+    });
+    for (const tx of txResolve) {
+      sendSvmTransaction(svm, signers[0], tx);
     }
   });
 
-  it("withdraw fee of token draft contest", async () => {
+  it("withdraw a token draft contest fee", async () => {
+    const contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
+    const contestMetadata = pg.coder.accounts.decode(
+      "contestMetadata",
+      Buffer.from(contestMetadataAccInfo.data)
+    );
     const signer = signers[0];
-    const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
-    const timestamp = Math.floor(Date.now() / 1000) - 60 * 60 * 24; // 1 day ago
-    const priceUpdates =
-      await priceServiceConnection.getPriceUpdatesAtTimestamp(
-        timestamp,
-        priceFeedIds,
-        { encoding: "base64" }
-      );
-    const priceUpdatesData = priceUpdates.binary.data;
 
-    const txBuilder = pythSolanaReceiver.newTransactionBuilder({
-      closeUpdateAccounts: true,
-    });
-    await txBuilder.addPostPriceUpdates(priceUpdatesData);
-    await txBuilder.addPriceConsumerInstructions(
-      async (getPriceUpdateAccount) => {
-        const priceUpdateAccounts = priceFeedIds.map((id) =>
-          getPriceUpdateAccount(id)
-        );
-
-        const accounts = {
-          signer: signer.publicKey,
-          contest: contestPda,
-          contestCredits: contestCreditsPda,
-          contestMetadata: contestMetadataPda,
-          mint,
-          escrowTokenAccount: escrowTokenAccountPda,
-          feeTokenAccount: feeTokenAccountPda,
-          feed0: priceUpdateAccounts[0],
-          feed1: priceUpdateAccounts[1] || null,
-          feed2: priceUpdateAccounts[2] || null,
-          feed3: priceUpdateAccounts[3] || null,
-          feed4: priceUpdateAccounts[4] || null,
-          tokenProgram: utils.token.TOKEN_PROGRAM_ID,
-        };
-
-        const txInstruction = await pg.methods
-          .resolveTokenDraftContest()
-          .accounts(accounts)
-          .instruction();
-
-        const instruction: InstructionWithEphemeralSigners = {
-          instruction: txInstruction,
-          signers: [],
-        };
-
-        return [instruction];
-      }
+    const owner = web3.Keypair.generate();
+    svm.airdrop(owner.publicKey, BigInt(LAMPORTS_PER_SOL));
+    const withdrawalTokenAccountAddress = createAssociateTokenAccount(
+      svm,
+      owner,
+      mint
     );
-
-    const versionedTxs = await txBuilder.buildVersionedTransactions({
-      computeUnitPriceMicroLamports: 50000,
-    });
-
-    const sigs = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
-      skipPreflight: false,
-    });
-
-    console.log("signatures:", sigs);
-
-    const contest = await pg.account.tokenDraftContest.fetch(contestPda);
-    // console.log("contest:", contest);
-    expect(contest.isResolved).equal(true);
-    expect(contest.numEntries).equal(numEntries);
-    expect(contest.winnerIds.length).equal(numWinners);
-
-    const contestMetadata = await pg.account.contestMetadata.fetch(
-      contestMetadataPda
-    );
-    const escrowTokenAccount = await getAccount(
-      provider.connection,
-      escrowTokenAccountPda
-    );
-    const feeTokenAccount = await getAccount(
-      provider.connection,
-      feeTokenAccountPda
-    );
-    const feePercent = contestMetadata.tokenDraftContestFeePercent;
-    const feeAmount = feeTokenAccount.amount;
-
-    console.log("escrowTokenAccount:", escrowTokenAccount.amount.toString());
-    console.log("feeTokenAccount:", feeTokenAccount.amount.toString());
-    console.log("feePercent:", feePercent.toString());
-
-    // const ownerWithdrawal = web3.Keypair.generate();
-    const ownerWithdrawal = signers[1];
-    await provider.connection.requestAirdrop(
-      ownerWithdrawal.publicKey,
-      10 * 1_000_000_000
-    );
-    console.log("ownerWithdrawal:", ownerWithdrawal.publicKey.toString());
-    let withdrawTokenAccount = await getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      ownerWithdrawal,
-      mint,
-      ownerWithdrawal.publicKey
-    );
-    console.log(
-      "withdrawTokenAccount:",
-      withdrawTokenAccount.amount.toString()
-    );
-
-    const withdrawFeeAccounts = {
+    const accounts = {
       signer: signer.publicKey,
       config: configPda,
-      feeTokenAccount: feeTokenAccountPda,
-      withdrawalTokenAccount: withdrawTokenAccount.address,
+      contestMetadata: contestMetadataPda,
       mint,
-      tokenProgram: utils.token.TOKEN_PROGRAM_ID,
+      programTokenAccount: programTokenAccountPda,
+      withdrawalTokenAccount: withdrawalTokenAccountAddress,
+      tokenProgram: TOKEN_PROGRAM_ID,
     };
 
-    const withdrawFeeTx = await pg.methods
-      .withdrawFee()
-      .accounts(withdrawFeeAccounts)
-      .signers([signer])
-      .rpc();
-    console.log("withdraw fee tx:", withdrawFeeTx);
-    withdrawTokenAccount = await getAccount(
-      provider.connection,
-      withdrawTokenAccount.address
+    const ixs = await pg.methods.withdrawFee().accounts(accounts).instruction();
+    const msg = new web3.TransactionMessage({
+      payerKey: signer.publicKey,
+      instructions: [ixs],
+      recentBlockhash: svm.latestBlockhash(),
+    }).compileToV0Message();
+    const tx = new web3.VersionedTransaction(msg);
+    sendSvmTransaction(svm, signer, tx);
+
+    const withdrawalTokenAccountAccInfo = svm.getAccount(
+      withdrawalTokenAccountAddress
     );
-    console.log(
-      "withdrawTokenAccount:",
-      withdrawTokenAccount.amount.toString()
+    const withdrawalTokenAccount = unpackAccount(
+      withdrawalTokenAccountAddress,
+      withdrawalTokenAccountAccInfo as any
     );
+
+    const feeAmount = contestMetadata.tokenDraftContestFeeAmount.toString();
+    expect(withdrawalTokenAccount.amount.toString()).to.equal(feeAmount);
   });
 });

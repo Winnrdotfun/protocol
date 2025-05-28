@@ -1,49 +1,47 @@
-import {
-  AnchorProvider,
-  setProvider,
-  web3,
-  workspace,
-  utils,
-} from "@coral-xyz/anchor";
+import { web3, workspace, utils } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Protocol } from "../target/types/protocol";
-import { createMint } from "./helpers";
+import { LiteSVM } from "litesvm";
 import { expect } from "chai";
-import { getAccount } from "@solana/spl-token";
+import { fixtureSvmBase } from "./fixtures/svm";
+import { Protocol } from "../target/types/protocol";
+import {
+  SEED_CONFIG,
+  SEED_CONTEST_METADATA,
+  SEED_PROGRAM_TOKEN_ACCOUNT,
+} from "./helpers/constants";
+import { unpackAccount } from "@solana/spl-token";
+import { sendSvmTransaction } from "./helpers";
 
 const { PublicKey } = web3;
 
-describe.skip("initialize", () => {
-  const provider = AnchorProvider.env();
-  setProvider(provider);
-  const connection = provider.connection;
-  const wallet = provider.wallet;
-  const signer = wallet.payer;
+describe("initialize", () => {
   const pg = workspace.Protocol as Program<Protocol>;
   const programId = pg.programId;
   let mint: web3.PublicKey;
 
+  let signers: web3.Keypair[];
+  let svm: LiteSVM;
+
   before(async () => {
     // Create a mint
-    mint = await createMint({ connection, owner: signer });
-    console.log("Mint created:", mint.toBase58());
+    const res = await fixtureSvmBase({ numSigners: 10 });
+    svm = res.svm;
+    mint = res.mint;
+    signers = res.signers;
   });
 
-  it("is initialized", async () => {
+  it("initialize program", async () => {
+    const signer = signers[0];
     const [configPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("config")],
+      [SEED_CONFIG],
       programId
     );
     const [contestMetadataPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("contest_metadata")],
+      [SEED_CONTEST_METADATA],
       programId
     );
-    const [escrowTokenAccountPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("escrow_token_account"), mint.toBuffer()],
-      programId
-    );
-    const [feeTokenAccountPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("fee_token_account"), mint.toBuffer()],
+    const [programTokenAccountPda] = PublicKey.findProgramAddressSync(
+      [SEED_PROGRAM_TOKEN_ACCOUNT, mint.toBuffer()],
       programId
     );
 
@@ -58,14 +56,14 @@ describe.skip("initialize", () => {
       signer: signer.publicKey,
       config: configPda,
       mint,
-      escrowTokenAccount: escrowTokenAccountPda,
-      feeTokenAccount: feeTokenAccountPda,
+      programTokenAccount: programTokenAccountPda,
       tokenProgram: utils.token.TOKEN_PROGRAM_ID,
     };
 
     const tokenDraftContestFeePercent = 10;
 
-    const recentBlockhash = await connection.getLatestBlockhash();
+    // const recentBlockhash = await connection.getLatestBlockhash();
+    const recentBlockhash = svm.latestBlockhash();
     const ixs0 = await pg.methods
       .initConfig(tokenDraftContestFeePercent)
       .accounts(initConfigAccounts)
@@ -77,37 +75,37 @@ describe.skip("initialize", () => {
     const msg = new web3.TransactionMessage({
       payerKey: signer.publicKey,
       instructions: [ixs0, ixs1],
-      recentBlockhash: recentBlockhash.blockhash,
+      recentBlockhash: recentBlockhash,
     }).compileToV0Message();
 
     const tx = new web3.VersionedTransaction(msg);
     tx.sign([signer]);
-    // const sig = await connection.simulateTransaction(tx);
-    const sig = await connection.sendTransaction(tx, { skipPreflight: false });
-    await connection.confirmTransaction({
-      blockhash: recentBlockhash.blockhash,
-      lastValidBlockHeight: recentBlockhash.lastValidBlockHeight,
-      signature: sig,
-    });
-    console.log("Tx signature:", sig);
 
-    const configAccount = await pg.account.config.fetch(configPda);
-    const escrowTokenAccount = await getAccount(
-      connection,
-      escrowTokenAccountPda
+    sendSvmTransaction(svm, signer, tx);
+
+    const configAccInfo = svm.getAccount(configPda);
+    const contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
+    const programTokenAccountAccInfo = svm.getAccount(programTokenAccountPda);
+    const configAccount = pg.coder.accounts.decode(
+      "config",
+      Buffer.from(configAccInfo.data)
     );
-    const feeTokenAccount = await getAccount(connection, feeTokenAccountPda);
+    const contestMetadataAccount = pg.coder.accounts.decode(
+      "contestMetadata",
+      Buffer.from(contestMetadataAccInfo.data)
+    );
+    const programTokenAccount = unpackAccount(
+      programTokenAccountPda,
+      programTokenAccountAccInfo as any
+    );
+
     expect(configAccount.mint.toBase58()).to.equal(mint.toBase58());
     expect(configAccount.admin.toBase58()).to.equal(
       signer.publicKey.toBase58()
     );
-    const contestMetadataAccount = await pg.account.contestMetadata.fetch(
-      contestMetadataPda
-    );
     expect(contestMetadataAccount.tokenDraftContestCount.toString()).to.equal(
       "0"
     );
-    expect(escrowTokenAccount.mint.toBase58()).to.equal(mint.toBase58());
-    expect(feeTokenAccount.mint.toBase58()).to.equal(mint.toBase58());
+    expect(programTokenAccount.mint.toBase58()).to.equal(mint.toBase58());
   });
 });
