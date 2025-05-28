@@ -57,7 +57,6 @@ describe("create", () => {
       [
         SEED_TOKEN_DRAFT_CONTEST,
         contestMetadata.tokenDraftContestCount.toArrayLike(Buffer, "le", 8),
-        signer.publicKey.toBuffer(),
       ],
       programId
     );

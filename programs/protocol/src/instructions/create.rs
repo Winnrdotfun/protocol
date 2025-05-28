@@ -24,7 +24,7 @@ pub struct CreateTokenDraftContest<'info> {
         init,
         payer = signer,
         space = 8 + TokenDraftContest::INIT_SPACE,
-        seeds = [SEED_TOKEN_DRAFT_CONTEST, contest_metadata.token_draft_contest_count.to_le_bytes().as_ref(), signer.key().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST, contest_metadata.token_draft_contest_count.to_le_bytes().as_ref()],
         bump
     )]
     pub contest: Box<Account<'info, TokenDraftContest>>,
