@@ -1,5 +1,5 @@
 use crate::constants::seeds::{SEED_CONTEST_METADATA, SEED_PROGRAM_TOKEN_ACCOUNT};
-use crate::instructions::{calc_avg_roi, get_token_roi};
+use crate::instructions::calc_avg_roi;
 use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
@@ -56,57 +56,49 @@ pub struct ResolveTokenDraftContestEr<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) -> Result<()> {
+pub fn er_resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContestEr>) -> Result<()> {
     let contest = &ctx.accounts.contest;
-    let current_time = Clock::get()?.unix_timestamp as u64;
 
-    require!(
-        contest.token_start_prices.len() > 0,
-        ContestError::ContestPriceNotSet
-    );
-
-    // Check that end time has passed
-    require!(
-        current_time > contest.end_time,
-        ContestError::ContestNotEnded
-    );
-
+    // Check that contest is not already resolved
     require!(!contest.is_resolved, ContestError::AlreadyResolved);
 
-    let feed_accounts: Vec<&Option<Box<Account<'_, PriceUpdateV2>>>> = vec![
-        &ctx.accounts.feed0,
-        &ctx.accounts.feed1,
-        &ctx.accounts.feed2,
-        &ctx.accounts.feed3,
-        &ctx.accounts.feed4,
-    ];
+    // Check that end time has passed
+    require!(contest.has_ended(), ContestError::ContestNotEnded);
 
-    let clock = Clock::get()?;
-    let mut token_rois: Vec<f64> = Vec::new();
-    for (i, feed_id) in contest.token_feed_ids.iter().enumerate() {
-        require!(feed_accounts[i].is_some(), ContestError::InvalidFeeds);
-        let feed_account = feed_accounts[i].as_ref().unwrap();
-        let start_price = contest.token_start_prices[i];
-        let price = get_token_roi(&clock, start_price, &feed_id, feed_account)?;
-        token_rois.push(price);
+    // Check that contest has sufficient entries
+    if contest.has_insufficient_entries() {
+        // If not enough entries, cancel the contest without any winners
+        ctx.accounts.contest.is_resolved = true;
+        return Ok(());
     }
-    ctx.accounts.contest.token_rois = token_rois.clone();
 
-    // Calculate the average ROI for each user
+    // Check start and end prices are set
+    require!(contest.has_prices(), ContestError::ContestPricesNotSet);
+
+    // Calculate the ROI by each token
+    let num_tokens = contest.token_feed_ids.len();
+    let mut token_rois: Vec<f64> = Vec::new();
+    for i in 0..num_tokens {
+        let start_price = contest.token_start_prices[i];
+        let end_price = contest.token_end_prices[i];
+        let roi = ((end_price - start_price) / start_price) * 100.0;
+        token_rois.push(roi);
+    }
+
+    // Calculate the average ROI of each user
     let num_entries = ctx.accounts.contest.num_entries as usize;
-    let num_tokens = ctx.accounts.contest.token_feed_ids.len();
     let credit_allocations = &ctx.accounts.contest_credits.credit_allocations;
     let mut user_avg_rois: Vec<(usize, f64)> = Vec::with_capacity(num_entries);
     for i in 0..num_entries {
         let alloc = &credit_allocations[(i * num_tokens)..(i * num_tokens + num_tokens)];
-        user_avg_rois.push((i, calc_avg_roi(alloc, &token_rois)))
+        user_avg_rois.push((i, calc_avg_roi(alloc, &token_rois)));
     }
 
-    // Find the top N users
-    let num_top_users = ctx.accounts.contest.winner_reward_allocation.len();
-    let winners = find_top_n_rois(&user_avg_rois, num_top_users);
+    // Find the top n users
+    let num_winners = ctx.accounts.contest.winner_reward_allocation.len();
+    let winners = find_top_n_rois(&user_avg_rois, num_winners);
 
-    // Store the top N users
+    // Store the top n users
     ctx.accounts.contest.winner_ids = winners.iter().map(|v| v.0 as u32).collect();
     ctx.accounts.contest.is_resolved = true;
 
@@ -120,6 +112,8 @@ pub fn resolve_token_draft_contest_er(ctx: Context<ResolveTokenDraftContestEr>) 
     let fee_amount = (fee_frac * total_pool_amount).floor() as u64;
     ctx.accounts.contest_metadata.token_draft_contest_fee_amount += fee_amount;
 
+    ctx.accounts.contest_metadata.exit(&crate::ID)?;
+    ctx.accounts.contest.exit(&crate::ID)?;
     commit_and_undelegate_accounts(
         &ctx.accounts.signer,
         vec![
