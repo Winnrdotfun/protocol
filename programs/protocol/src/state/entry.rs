@@ -1,7 +1,6 @@
-use crate::state::contest::MAX_TOKEN_PER_DRAFT;
 use anchor_lang::prelude::*;
 
-pub const TOTAL_CREDIT_PER_CONTEST: u8 = 100;
+use crate::constants::MAX_TOKEN_PER_DRAFT;
 
 #[account]
 #[derive(InitSpace)]

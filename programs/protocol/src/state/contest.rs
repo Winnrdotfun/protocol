@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-pub const MAX_TOKEN_PER_DRAFT: usize = 5;
+use crate::constants::MAX_TOKEN_PER_DRAFT;
 
 #[account]
 #[derive(InitSpace)]

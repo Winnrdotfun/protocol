@@ -4,25 +4,18 @@ use anchor_spl::token_interface::{
 };
 
 use crate::constants::seeds::{
-    SEED_CONFIG, SEED_PROGRAM_TOKEN_ACCOUNT, SEED_TOKEN_DRAFT_CONTEST_CREDITS,
-    SEED_TOKEN_DRAFT_CONTEST_ENTRY,
+    SEED_PROGRAM_TOKEN_ACCOUNT, SEED_TOKEN_DRAFT_CONTEST_CREDITS, SEED_TOKEN_DRAFT_CONTEST_ENTRY,
 };
+use crate::constants::TOTAL_CREDIT_PER_CONTEST;
 use crate::errors::ContestError;
-use crate::state::config::Config;
 use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
-use crate::state::entry::{TokenDraftContestEntry, TOTAL_CREDIT_PER_CONTEST};
+use crate::state::entry::TokenDraftContestEntry;
 
 #[derive(Accounts)]
 pub struct EnterTokenDraftContest<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-
-    #[account(
-        seeds = [SEED_CONFIG],
-        bump
-    )]
-    pub config: Box<Account<'info, Config>>,
 
     #[account(mut)]
     pub contest: Box<Account<'info, TokenDraftContest>>,
