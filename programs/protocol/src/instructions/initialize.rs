@@ -18,7 +18,7 @@ pub struct InitConfigs<'info> {
         seeds = [SEED_CONFIG],
         bump
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub config: AccountLoader<'info, Config>,
 
     #[account(
         init,
@@ -27,7 +27,7 @@ pub struct InitConfigs<'info> {
         seeds = [SEED_CONTEST_METADATA],
         bump
     )]
-    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
+    pub contest_metadata: AccountLoader<'info, ContestMetadata>,
 
     pub mint: Box<InterfaceAccount<'info, Mint>>,
 
@@ -43,9 +43,9 @@ pub struct InitTokenAccounts<'info> {
         seeds = [SEED_CONFIG],
         bump
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub config: AccountLoader<'info, Config>,
 
-    #[account(address = config.mint)]
+    #[account(address = config.load()?.mint)]
     pub mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
@@ -65,17 +65,15 @@ pub struct InitTokenAccounts<'info> {
 }
 
 pub fn init_config(ctx: Context<InitConfigs>, token_draft_contest_fee_percent: u8) -> Result<()> {
-    let config = &mut ctx.accounts.config;
-
     require!(
         token_draft_contest_fee_percent < 100,
         ConfigError::InvalidFeePercent
     );
-
-    let contest_metadata = &mut ctx.accounts.contest_metadata;
+    let mut config = ctx.accounts.config.load_init()?;
+    let mut contest_metadata = ctx.accounts.contest_metadata.load_init()?;
 
     config.admin = ctx.accounts.signer.key();
-    config.mint = (*(ctx.accounts.mint)).key();
+    config.mint = ctx.accounts.mint.key();
 
     contest_metadata.token_draft_contest_count = 0;
     contest_metadata.token_draft_contest_fee_percent = token_draft_contest_fee_percent;

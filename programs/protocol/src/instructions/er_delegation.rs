@@ -18,7 +18,7 @@ pub struct ErDelegate<'info> {
         seeds = [SEED_CONTEST_METADATA],
         bump
     )]
-    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
+    pub contest_metadata: AccountLoader<'info, ContestMetadata>,
 
     #[account(mut, del)]
     pub contest: Box<Account<'info, TokenDraftContest>>,

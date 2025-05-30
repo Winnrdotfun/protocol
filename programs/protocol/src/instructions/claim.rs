@@ -19,11 +19,10 @@ pub struct ClaimTokenDraftContest<'info> {
     pub contest: Box<Account<'info, TokenDraftContest>>,
 
     #[account(
-        mut,
         seeds = [SEED_CONTEST_METADATA],
         bump
     )]
-    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
+    pub contest_metadata: AccountLoader<'info, ContestMetadata>,
 
     #[account(
         mut,
@@ -78,11 +77,8 @@ pub fn claim_token_draft_contest(ctx: Context<ClaimTokenDraftContest>) -> Result
     let alloc = contest.winner_reward_allocation[pos];
 
     // Calculate the user reward amount based on the credit allocation
-    let fee_frac = ctx
-        .accounts
-        .contest_metadata
-        .token_draft_contest_fee_percent as f64
-        / 100.0;
+    let contest_metadata = ctx.accounts.contest_metadata.load()?;
+    let fee_frac = contest_metadata.token_draft_contest_fee_percent as f64 / 100.0;
     let total_pool_amount = contest.pool_amount();
     let fee_amount = (fee_frac * total_pool_amount as f64).floor() as u64;
     let total_reward_amount = total_pool_amount - fee_amount;

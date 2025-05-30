@@ -22,7 +22,7 @@ pub struct ResolveTokenDraftContestEr<'info> {
         seeds = [SEED_CONTEST_METADATA],
         bump
     )]
-    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
+    pub contest_metadata: AccountLoader<'info, ContestMetadata>,
 
     #[account(mut)]
     pub contest: Box<Account<'info, TokenDraftContest>>,
@@ -103,14 +103,11 @@ pub fn er_resolve_token_draft_contest(ctx: Context<ResolveTokenDraftContestEr>) 
     ctx.accounts.contest.is_resolved = true;
 
     // Accumulate the fee amount from this contest
-    let fee_frac = ctx
-        .accounts
-        .contest_metadata
-        .token_draft_contest_fee_percent as f64
-        / 100.0;
+    let mut contest_metadata = ctx.accounts.contest_metadata.load_mut()?;
+    let fee_frac = contest_metadata.token_draft_contest_fee_percent as f64 / 100.0;
     let total_pool_amount = ctx.accounts.contest.pool_amount() as f64;
     let fee_amount = (fee_frac * total_pool_amount).floor() as u64;
-    ctx.accounts.contest_metadata.token_draft_contest_fee_amount += fee_amount;
+    contest_metadata.token_draft_contest_fee_amount += fee_amount;
 
     ctx.accounts.contest_metadata.exit(&crate::ID)?;
     ctx.accounts.contest.exit(&crate::ID)?;

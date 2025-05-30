@@ -1,8 +1,9 @@
 use crate::constants::seeds::{
     SEED_CONTEST_METADATA, SEED_TOKEN_DRAFT_CONTEST, SEED_TOKEN_DRAFT_CONTEST_CREDITS,
 };
+use crate::constants::MAX_TOKEN_PER_DRAFT;
 use crate::errors::ContestError;
-use crate::state::contest::{TokenDraftContest, MAX_TOKEN_PER_DRAFT};
+use crate::state::contest::TokenDraftContest;
 use crate::state::credit::TokenDraftContestCredits;
 use crate::state::metadata::ContestMetadata;
 use anchor_lang::prelude::*;
@@ -18,13 +19,13 @@ pub struct CreateTokenDraftContest<'info> {
         seeds = [SEED_CONTEST_METADATA],
         bump
     )]
-    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
+    pub contest_metadata: AccountLoader<'info, ContestMetadata>,
 
     #[account(
         init,
         payer = signer,
         space = 8 + TokenDraftContest::INIT_SPACE,
-        seeds = [SEED_TOKEN_DRAFT_CONTEST, contest_metadata.token_draft_contest_count.to_le_bytes().as_ref()],
+        seeds = [SEED_TOKEN_DRAFT_CONTEST, contest_metadata.load()?.token_draft_contest_count.to_le_bytes().as_ref()],
         bump
     )]
     pub contest: Box<Account<'info, TokenDraftContest>>,
@@ -89,7 +90,8 @@ pub fn create_token_draft_contest(
     }
 
     // Set contest parameters
-    contest.id = ctx.accounts.contest_metadata.token_draft_contest_count;
+    let mut contest_metadata = ctx.accounts.contest_metadata.load_mut()?;
+    contest.id = contest_metadata.token_draft_contest_count;
     contest.creator = ctx.accounts.signer.key();
     contest.start_time = start_time;
     contest.end_time = end_time;
@@ -105,7 +107,7 @@ pub fn create_token_draft_contest(
     ctx.accounts.contest.winner_reward_allocation = reward_allocation;
 
     // Update contest metadata
-    ctx.accounts.contest_metadata.token_draft_contest_count += 1;
+    contest_metadata.token_draft_contest_count += 1;
 
     Ok(())
 }

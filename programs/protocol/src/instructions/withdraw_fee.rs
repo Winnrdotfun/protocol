@@ -11,7 +11,7 @@ use anchor_spl::token_interface::{
 pub struct WithdrawFee<'info> {
     #[account(
         mut,
-        address = config.admin
+        address = config.load()?.admin
     )]
     pub signer: Signer<'info>,
 
@@ -19,14 +19,14 @@ pub struct WithdrawFee<'info> {
         seeds = [SEED_CONFIG],
         bump,
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub config: AccountLoader<'info, Config>,
 
     #[account(
         mut,
         seeds = [SEED_CONTEST_METADATA],
         bump,
     )]
-    pub contest_metadata: Box<Account<'info, ContestMetadata>>,
+    pub contest_metadata: AccountLoader<'info, ContestMetadata>,
 
     #[account(mut)]
     pub mint: Box<InterfaceAccount<'info, Mint>>,
@@ -48,7 +48,8 @@ pub struct WithdrawFee<'info> {
 }
 
 pub fn withdraw_contest_fee(ctx: Context<WithdrawFee>) -> Result<()> {
-    let total_fee_amount = ctx.accounts.contest_metadata.token_draft_contest_fee_amount;
+    let mut contest_metadata = ctx.accounts.contest_metadata.load_mut()?;
+    let total_fee_amount = contest_metadata.token_draft_contest_fee_amount;
 
     // Transfer the fee to the signer
     let cpi_accounts = TransferChecked {
@@ -66,6 +67,9 @@ pub fn withdraw_contest_fee(ctx: Context<WithdrawFee>) -> Result<()> {
     let cpi_program = ctx.accounts.token_program.to_account_info();
     let cpi_context = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
     transfer_checked(cpi_context, total_fee_amount, ctx.accounts.mint.decimals)?;
+
+    // Reset fee counter
+    contest_metadata.token_draft_contest_fee_amount = 0;
 
     Ok(())
 }
