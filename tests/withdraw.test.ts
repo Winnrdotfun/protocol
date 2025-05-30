@@ -15,7 +15,7 @@ import {
   UNITS_PER_USDC,
 } from "./helpers";
 import { Protocol } from "../target/types/protocol";
-import { fixtureWithContest } from "./fixtures/svm";
+import { fixtureWithContest } from "./fixtures";
 import { LiteSVM } from "litesvm";
 import { setSvmTimeTo } from "./helpers/time";
 import { expect } from "chai";
@@ -109,7 +109,7 @@ describe("withdraw", () => {
     }
 
     // Resolve contest
-    const { txs: txResolve } = await getResolveContestTx({
+    const { tx } = await getResolveContestTx({
       svm,
       program: pg,
       signer: signers[0],
@@ -121,9 +121,7 @@ describe("withdraw", () => {
       hermesClient: priceServiceConnection,
       pythSolanaReceiver,
     });
-    for (const tx of txResolve) {
-      sendSvmTransaction(svm, signers[0], tx);
-    }
+    sendSvmTransaction(svm, signers[0], tx);
   });
 
   it("withdraw a token draft contest entry fee", async () => {

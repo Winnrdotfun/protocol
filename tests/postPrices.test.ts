@@ -8,7 +8,7 @@ import {
 import { Account } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { LiteSVM } from "litesvm";
-import { fixtureWithContest } from "./fixtures/svm";
+import { fixtureWithContest } from "./fixtures";
 import { Protocol } from "../target/types/protocol";
 import {
   ContestParams,

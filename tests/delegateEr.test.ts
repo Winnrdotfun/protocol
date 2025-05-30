@@ -10,7 +10,7 @@ import {
   sendSvmTransaction,
   UNITS_PER_USDC,
 } from "./helpers";
-import { fixtureWithContest } from "./fixtures/svm";
+import { fixtureWithContest } from "./fixtures";
 
 describe.skip("delegateEr", () => {
   const pg = workspace.Protocol as Program<Protocol>;

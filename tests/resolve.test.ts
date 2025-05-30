@@ -1,9 +1,6 @@
-import { web3, utils, BN } from "@coral-xyz/anchor";
+import { web3, BN } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import {
-  InstructionWithEphemeralSigners,
-  PythSolanaReceiver,
-} from "@pythnetwork/pyth-solana-receiver";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { Account, unpackAccount } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import {
@@ -15,7 +12,7 @@ import {
   UNITS_PER_USDC,
 } from "./helpers";
 import { expect } from "chai";
-import { fixtureWithContest } from "./fixtures/svm";
+import { fixtureWithContest } from "./fixtures";
 import { ONE_DAY, ONE_HOUR } from "./helpers";
 import { LiteSVM } from "litesvm";
 import { Protocol } from "../target/types/protocol";
@@ -112,84 +109,31 @@ describe("resolve", () => {
       sendSvmTransaction(svm, signers[0], tx);
     }
   });
-
   it("resolve a token draft contest", async () => {
     const signer = signers[0];
-    const priceFeedIds = [pythPriceFeedIds.bonk, pythPriceFeedIds.popcat];
+    let contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
+    let contestMetadata = pg.coder.accounts.decode(
+      "contestMetadata",
+      Buffer.from(contestMetadataAccInfo.data)
+    );
     let contestAccInfo = svm.getAccount(contestPda);
     let contest = pg.coder.accounts.decode(
       "tokenDraftContest",
       Buffer.from(contestAccInfo.data)
     );
 
-    // Reach end time to resolve
-    const endTimestamp = contest.endTime.toNumber();
-    setSvmTimeTo(svm, endTimestamp + 1);
+    const accounts = {
+      signer: signer.publicKey,
+      contestMetadata: contestMetadataPda,
+      contest: contestPda,
+      contestCredits: contestCreditsPda,
+    };
 
-    const priceUpdates =
-      await priceServiceConnection.getPriceUpdatesAtTimestamp(
-        endTimestamp,
-        priceFeedIds,
-        { encoding: "base64" }
-      );
-    const priceUpdatesData = priceUpdates.binary.data;
-
-    const txBuilder = pythSolanaReceiver.newTransactionBuilder({
-      closeUpdateAccounts: true,
-    });
-    await txBuilder.addPostPriceUpdates(priceUpdatesData);
-    await txBuilder.addPriceConsumerInstructions(
-      async (getPriceUpdateAccount) => {
-        const priceUpdateAccounts = priceFeedIds.map((id) =>
-          getPriceUpdateAccount(id)
-        );
-
-        const accounts = {
-          signer: signer.publicKey,
-          contest: contestPda,
-          contestCredits: contestCreditsPda,
-          contestMetadata: contestMetadataPda,
-          mint,
-          programTokenAccount: programTokenAccountPda,
-          feed0: priceUpdateAccounts[0],
-          feed1: priceUpdateAccounts[1] || null,
-          feed2: priceUpdateAccounts[2] || null,
-          feed3: priceUpdateAccounts[3] || null,
-          feed4: priceUpdateAccounts[4] || null,
-          tokenProgram: utils.token.TOKEN_PROGRAM_ID,
-        };
-
-        const txInstruction = await pg.methods
-          .resolveTokenDraftContest()
-          .accounts(accounts)
-          .instruction();
-
-        const instruction: InstructionWithEphemeralSigners = {
-          instruction: txInstruction,
-          signers: [],
-        };
-
-        return [instruction];
-      }
-    );
-    const txs = await txBuilder.buildVersionedTransactions({
-      computeUnitPriceMicroLamports: 50000,
-    });
-
-    for (let i = 0; i < txs.length; i++) {
-      const tx = txs[i].tx;
-      const signers = txs[i].signers;
-
-      const ixs = web3.TransactionMessage.decompile(tx.message).instructions;
-      const msg = new web3.TransactionMessage({
-        payerKey: signer.publicKey,
-        instructions: ixs,
-        recentBlockhash: svm.latestBlockhash(),
-      }).compileToV0Message();
-      const vtx = new web3.VersionedTransaction(msg);
-      vtx.sign([...signers]);
-      sendSvmTransaction(svm, signer, vtx);
-    }
+    const tx = await pg.methods
+      .resolveTokenDraftContest()
+      .accounts(accounts)
+      .transaction();
+    sendSvmTransaction(svm, signer, tx);
 
     contestAccInfo = svm.getAccount(contestPda);
     contest = pg.coder.accounts.decode(
@@ -198,13 +142,13 @@ describe("resolve", () => {
     );
 
     contestAccInfo = svm.getAccount(contestPda);
-    const contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
+    contestMetadataAccInfo = svm.getAccount(contestMetadataPda);
     const programTokenAccountAccInfo = svm.getAccount(programTokenAccountPda);
     contest = pg.coder.accounts.decode(
       "tokenDraftContest",
       Buffer.from(contestAccInfo.data)
     );
-    const contestMetadata = pg.coder.accounts.decode(
+    contestMetadata = pg.coder.accounts.decode(
       "contestMetadata",
       Buffer.from(contestMetadataAccInfo.data)
     );

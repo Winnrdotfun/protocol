@@ -3,7 +3,7 @@ import { LiteSVM } from "litesvm";
 import { web3, BN } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { fixtureWithContest } from "./fixtures/svm";
+import { fixtureWithContest } from "./fixtures";
 import {
   SEED_TOKEN_DRAFT_CONTEST_CREDITS,
   SEED_TOKEN_DRAFT_CONTEST_ENTRY,

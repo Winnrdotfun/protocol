@@ -2,7 +2,7 @@ import { web3, workspace, utils } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { LiteSVM } from "litesvm";
 import { expect } from "chai";
-import { fixtureSvmBase } from "./fixtures/svm";
+import { fixtureSvmBase } from "./fixtures";
 import { Protocol } from "../target/types/protocol";
 import {
   SEED_CONFIG,

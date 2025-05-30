@@ -332,356 +332,38 @@ export const getResolveContestTx = async (args: {
     svm,
     program,
     signer,
-    mint,
     contestPda,
     contestMetadataPda,
     contestCreditsPda,
-    hermesClient,
-    pythSolanaReceiver,
-    programTokenAccountPda,
   } = args;
-
-  let contest: any;
-  if (svm) {
-    let contestAccInfo = svm.getAccount(contestPda);
-    contest = program.coder.accounts.decode(
-      "tokenDraftContest",
-      Buffer.from(contestAccInfo.data)
-    );
-  } else {
-    contest = await program.account.tokenDraftContest.fetch(contestPda);
-  }
-
-  const priceFeedIds = contest.tokenFeedIds.map(
-    (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
-  );
-
-  const endTimestamp = contest.endTime.toNumber();
-  const priceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
-    endTimestamp,
-    priceFeedIds,
-    { encoding: "base64" }
-  );
-  const priceUpdatesData = priceUpdates.binary.data;
-  const txBuilder = pythSolanaReceiver.newTransactionBuilder({
-    closeUpdateAccounts: true,
-  });
-  await txBuilder.addPostPriceUpdates(priceUpdatesData);
-  await txBuilder.addPriceConsumerInstructions(
-    async (getPriceUpdateAccount) => {
-      const priceUpdateAccounts = priceFeedIds.map((id) =>
-        getPriceUpdateAccount(id)
-      );
-
-      const accounts = {
-        signer: signer.publicKey,
-        contest: contestPda,
-        contestCredits: contestCreditsPda,
-        contestMetadata: contestMetadataPda,
-        mint,
-        programTokenAccount: programTokenAccountPda,
-        feed0: priceUpdateAccounts[0],
-        feed1: priceUpdateAccounts[1] || null,
-        feed2: priceUpdateAccounts[2] || null,
-        feed3: priceUpdateAccounts[3] || null,
-        feed4: priceUpdateAccounts[4] || null,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      };
-
-      const txInstruction = await program.methods
-        .resolveTokenDraftContest()
-        .accounts(accounts)
-        .instruction();
-
-      const instruction: InstructionWithEphemeralSigners = {
-        instruction: txInstruction,
-        signers: [signer],
-      };
-
-      return [instruction];
-    }
-  );
-
-  const txs = await txBuilder.buildVersionedTransactions({
-    computeUnitPriceMicroLamports: 50000,
-  });
-
-  const vtxs: web3.VersionedTransaction[] = [];
-  for (let i = 0; i < txs.length; i++) {
-    const tx = txs[i].tx;
-    const signers = txs[i].signers;
-
-    const ixs = web3.TransactionMessage.decompile(tx.message).instructions;
-    const msg = new web3.TransactionMessage({
-      payerKey: signer.publicKey,
-      instructions: ixs,
-      recentBlockhash: svm.latestBlockhash(),
-    }).compileToV0Message();
-    const vtx = new web3.VersionedTransaction(msg);
-    vtx.sign([...signers]);
-    vtxs.push(vtx);
-  }
-
-  return { txs: vtxs };
-};
-
-export const createContest = async (args: {
-  provider: AnchorProvider;
-  program: Program<Protocol>;
-  contestMetadataPda: web3.PublicKey;
-  pythSolanaReceiver: PythSolanaReceiver;
-  contestParams: {
-    startTime: number;
-    endTime: number;
-    entryFee: bigint;
-    maxEntries: number;
-    priceFeedIds: string[];
-    rewardAllocation: number[];
-  };
-}) => {
-  const {
-    provider,
-    program: pg,
-    contestMetadataPda,
-    pythSolanaReceiver,
-    contestParams,
-  } = args;
-  const wallet = provider.wallet;
-  const signer = wallet.payer;
-
-  const { tx, contestPda, contestCreditsPda } = await getCreateContestTx({
-    program: pg,
-    signer,
-    contestMetadataPda,
-    pythSolanaReceiver,
-    contestParams,
-  });
-
-  const txSignature = await pg.provider.send(tx, [signer], {
-    skipPreflight: false,
-    preflightCommitment: "confirmed",
-  });
-
-  return { txSignature, contestPda, contestCreditsPda };
-};
-
-export const enterContest = async (args: {
-  signer: web3.Keypair;
-  program: Program<Protocol>;
-  configPda: web3.PublicKey;
-  contestPda: web3.PublicKey;
-  mint: web3.PublicKey;
-  escrowTokenAccountPda: web3.PublicKey;
-  feeTokenAccountPda: web3.PublicKey;
-  signerTokenAccount: Account;
-  creditAllocation: number[];
-}) => {
-  const {
-    contestPda,
-    program,
-    signer,
-    configPda,
-    mint,
-    escrowTokenAccountPda,
-    feeTokenAccountPda,
-    signerTokenAccount,
-    creditAllocation,
-  } = args;
-  const programId = program.programId;
-  const [contestEntryPda] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("token_draft_contest_entry"),
-      contestPda.toBuffer(),
-      signer.publicKey.toBuffer(),
-    ],
-    programId
-  );
-  const [contestCreditsPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("token_draft_contest_credits"), contestPda.toBuffer()],
-    programId
-  );
 
   const accounts = {
     signer: signer.publicKey,
-    config: configPda,
+    contestMetadata: contestMetadataPda,
     contest: contestPda,
-    contestEntry: contestEntryPda,
     contestCredits: contestCreditsPda,
-    mint,
-    escrowTokenAccount: escrowTokenAccountPda,
-    feeTokenAccount: feeTokenAccountPda,
-    signerTokenAccount: signerTokenAccount.address,
-    tokenProgram: utils.token.TOKEN_PROGRAM_ID,
   };
 
-  const creditAllocationInput = Buffer.from(creditAllocation);
-  const txSignature = await program.methods
-    .enterTokenDraftContest(creditAllocationInput)
+  let recentBlockhash: string;
+  if (svm) {
+    recentBlockhash = svm.latestBlockhash();
+  } else {
+    recentBlockhash = await program.provider.connection
+      .getLatestBlockhash()
+      .then((x) => x.blockhash);
+  }
+
+  const ix = await program.methods
+    .resolveTokenDraftContest()
     .accounts(accounts)
-    .signers([signer])
-    .rpc();
+    .instruction();
+  const msg = new web3.TransactionMessage({
+    payerKey: signer.publicKey,
+    instructions: [ix],
+    recentBlockhash,
+  }).compileToV0Message();
+  const tx = new web3.VersionedTransaction(msg);
+  tx.sign([signer]);
 
-  return { txSignature, contestEntryPda, contestCreditsPda };
-};
-
-export const postContestPrices = async (args: {
-  program: Program<Protocol>;
-  signer: web3.Keypair;
-  contestPda: web3.PublicKey;
-  hermesClient: HermesClient;
-  pythSolanaReceiver: PythSolanaReceiver;
-}) => {
-  const {
-    program: pg,
-    signer,
-    contestPda,
-    pythSolanaReceiver,
-    hermesClient,
-  } = args;
-  let contest = await pg.account.tokenDraftContest.fetch(contestPda);
-
-  const priceFeedIds = contest.tokenFeedIds.map(
-    (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
-  );
-  const startTimestamp = now() - 60 * 60; // 1 hour ago
-  // const startTimestamp = contest.endTime.toNumber();
-  const priceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
-    startTimestamp,
-    priceFeedIds,
-    { encoding: "base64" }
-  );
-  const priceUpdatesData = priceUpdates.binary.data;
-  const txBuilder = pythSolanaReceiver.newTransactionBuilder({
-    closeUpdateAccounts: true,
-  });
-  await txBuilder.addPostPriceUpdates(priceUpdatesData);
-  await txBuilder.addPriceConsumerInstructions(
-    async (getPriceUpdateAccount) => {
-      const priceUpdateAccounts = priceFeedIds.map((id) =>
-        getPriceUpdateAccount(id)
-      );
-
-      const accounts = {
-        signer: signer.publicKey,
-        contest: contestPda,
-        feed0: priceUpdateAccounts[0],
-        feed1: priceUpdateAccounts[1] || null,
-        feed2: priceUpdateAccounts[2] || null,
-        feed3: priceUpdateAccounts[3] || null,
-        feed4: priceUpdateAccounts[4] || null,
-        tokenProgram: utils.token.TOKEN_PROGRAM_ID,
-      };
-
-      const txInstruction = await pg.methods
-        .postTokenDraftContestPrices()
-        .accounts(accounts)
-        .instruction();
-
-      const instruction: InstructionWithEphemeralSigners = {
-        instruction: txInstruction,
-        signers: [signer],
-      };
-
-      return [instruction];
-    }
-  );
-
-  const versionedTxs = await txBuilder.buildVersionedTransactions({
-    computeUnitPriceMicroLamports: 50000,
-  });
-
-  const txSignatures = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
-    skipPreflight: false,
-  });
-
-  return { txSignatures };
-};
-
-export const resolveContest = async (args: {
-  program: Program<Protocol>;
-  signer: web3.Keypair;
-  hermesClient: HermesClient;
-  pythSolanaReceiver: PythSolanaReceiver;
-  mint: web3.PublicKey;
-  contestPda: web3.PublicKey;
-  contestMetadataPda: web3.PublicKey;
-  contestCreditsPda: web3.PublicKey;
-  escrowTokenAccountPda: web3.PublicKey;
-  feeTokenAccountPda: web3.PublicKey;
-}) => {
-  const {
-    program,
-    signer,
-    mint,
-    contestPda,
-    contestMetadataPda,
-    contestCreditsPda,
-    hermesClient,
-    pythSolanaReceiver,
-    escrowTokenAccountPda,
-    feeTokenAccountPda,
-  } = args;
-  const contest = await program.account.tokenDraftContest.fetch(contestPda);
-
-  const priceFeedIds = contest.tokenFeedIds.map(
-    (v) => "0x" + v.toBuffer().toString("hex").toLowerCase()
-  );
-
-  const endTimestamp = Math.floor(Date.now() / 1000) - 60 * 60 * 24; // 1 day ago
-  // const endTimestamp = contest.endTime.toNumber();
-  const priceUpdates = await hermesClient.getPriceUpdatesAtTimestamp(
-    endTimestamp,
-    priceFeedIds,
-    { encoding: "base64" }
-  );
-  const priceUpdatesData = priceUpdates.binary.data;
-  const txBuilder = pythSolanaReceiver.newTransactionBuilder({
-    closeUpdateAccounts: true,
-  });
-  await txBuilder.addPostPriceUpdates(priceUpdatesData);
-  await txBuilder.addPriceConsumerInstructions(
-    async (getPriceUpdateAccount) => {
-      const priceUpdateAccounts = priceFeedIds.map((id) =>
-        getPriceUpdateAccount(id)
-      );
-
-      const accounts = {
-        signer: signer.publicKey,
-        contest: contestPda,
-        contestCredits: contestCreditsPda,
-        contestMetadata: contestMetadataPda,
-        mint,
-        escrowTokenAccount: escrowTokenAccountPda,
-        feeTokenAccount: feeTokenAccountPda,
-        feed0: priceUpdateAccounts[0],
-        feed1: priceUpdateAccounts[1] || null,
-        feed2: priceUpdateAccounts[2] || null,
-        feed3: priceUpdateAccounts[3] || null,
-        feed4: priceUpdateAccounts[4] || null,
-        tokenProgram: utils.token.TOKEN_PROGRAM_ID,
-      };
-
-      const txInstruction = await program.methods
-        .resolveTokenDraftContest()
-        .accounts(accounts)
-        .instruction();
-
-      const instruction: InstructionWithEphemeralSigners = {
-        instruction: txInstruction,
-        signers: [signer],
-      };
-
-      return [instruction];
-    }
-  );
-
-  const versionedTxs = await txBuilder.buildVersionedTransactions({
-    computeUnitPriceMicroLamports: 50000,
-  });
-
-  const txSignatures = await pythSolanaReceiver.provider.sendAll(versionedTxs, {
-    skipPreflight: false,
-  });
-
-  return { txSignatures };
+  return { tx };
 };
